@@ -3,21 +3,24 @@
 42.510 Statistical Learning for Data Science (SUTD, 2026), catalog topic 1.3.
 Team: [Name 1], [Name 2], [Name 3], [Name 4].
 
-Status, 15 Oct 2026: LTA traffic data collected 24/7 since 14 Oct 2026. Proposal due 17 Oct; no modelling until the proposal is approved (Brief §6.1).
+Status, 16 Oct 2026: LTA traffic data collected 24/7 since 14 Oct 2026 (desktop until 16 Oct; since then two collectors with two keys on the Linux mini PC, see `DECISIONS.md`). Proposal due 17 Oct; no modelling until the proposal is approved (Brief §6.1).
 
 ## Files
 
 | Path | What it does | How to run |
 |---|---|---|
-| `analysis/lta_collector.py` | Collects LTA DataMall feeds 24/7: Traffic Speed Bands at every LTA update (about every 5 min), incidents and VMS (every 2 min), estimated travel times (every 5 min), road works and road openings (daily). Python standard library only. | In the background, set up by `01_collector_monitor.ipynb` |
+| `analysis/lta_collector.py` | Collects LTA DataMall feeds 24/7: Traffic Speed Bands once per LTA update (about every 5 min), incidents and VMS (every 2 min), estimated travel times (every 5 min), road works and road openings (daily), into `data_raw/`. Python standard library only. Pauses to the next hour if LTA's rate limit (~4,000 calls/key/hour) is hit. | systemd service `lta-collector` on the Linux PC (`docs/LINUX_SETUP_FOR_CLAUDE_CODE.md`); on Windows via `01_collector_monitor.ipynb` |
 | `analysis/lta_collector.py --mode expressway` | Second collector (option C, decided 16 Oct 2026): only the 58 speed-band pages that hold the 2,598 expressway links, every 2 min, with a second key (`LTA_ACCOUNT_KEY2`), into `data_raw_expressway/`. Catches updates that one fetch per update misses, because LTA's pages lag each other. | systemd service `lta-collector-expressway` on the Linux PC; see `docs/LINUX_SETUP_FOR_CLAUDE_CODE.md` Step 4b |
 | `check.sh` | Health check of both Linux collectors (service, heartbeat, last hour's fetches, disk) | `~/slds-1.3/check.sh` |
-| `01_collector_monitor.ipynb` | Creates the Windows scheduled task that keeps the collector running; daily health check; stop. | Cells 1–4 once per machine; cell 5 daily |
+| `01_collector_monitor.ipynb` | Windows only (desktop, now a cold spare): creates the scheduled task that keeps the collector running; health check; stop. | Cells 1–4 once per machine; cell 5 daily |
 | `analysis/get_context_data.py` | NEA 5-minute rainfall (downloaded by date), MOM public holidays, MOE school terms and F1 closure dates, written to `data_processed/` | `.venv\Scripts\python analysis\get_context_data.py` |
-| `04_process.ipynb` | Raw files → link registry, expressway speed-band panel, quality report, incidents, analysis panel (Parquet) | Top to bottom |
+| `04_process.ipynb` | Raw files → link registry, expressway speed-band panel, quality report, incidents, analysis panel (Parquet). Reads every `data_raw*/` folder (both collectors, plus the desktop's data if copied in as `data_raw_desktop/`) and removes duplicates on (link, LTA update time). | Top to bottom |
 | `03_visuals.ipynb` | Maps, time–space diagrams, share of links by speed band | Cell 1, then any plot cell |
 | `analysis/00_check_sources.R`, `00_check_sources.ipynb` | One-off check of every source (run 13 Oct 2026: 315 requests, 0 failed) | Done |
 | `analysis/00_check_sources.py`, `00_check_sources_python.ipynb` | The same check in Python (standard library only); same outputs in `data_raw/source_check/` (run 16 Oct 2026: 315 requests, 0 failed) | `python3 analysis/00_check_sources.py`, or the notebook |
+| `DECISIONS.md` | Dated, frozen design and collection decisions; append only | Read before changing anything |
+| `docs/COLLECTION_REVIEW_2026-10-16.md` | Why and how collection changed on 16 Oct: LTA's rate limit, out-of-sync pages, options | Read once |
+| `docs/LINUX_SETUP_FOR_CLAUDE_CODE.md` | Step-by-step setup of both collectors on the Linux PC | Once per machine |
 | `setup_env.bat` (Windows), `setup_env.sh` (Linux), `requirements.txt` | Creates `.venv` with polars, numpy, matplotlib and Jupyter, and the kernel "Python (SLDS 1.3)" | Once per machine |
 
 The notebooks sit in the project folder because they use it as their working directory.
@@ -43,7 +46,7 @@ Planned: processing into ~1 km expressway segments, and the modelling scripts in
 
 ## Data
 
-Not in this repository. `data_raw/` holds the collector output (several GB, never edited); `data_processed/` is rebuilt from it. LTA serves only the current state, so raw snapshots cannot be downloaded again: back up `data_raw/` separately.
+Not in this repository. `data_raw/` (whole network) and `data_raw_expressway/` (expressway pages) hold the collector output (several GB, never edited); `data_processed/` is rebuilt from them. LTA serves only the current state, so raw snapshots cannot be downloaded again: back up both folders separately.
 
 ## Licence notice
 

@@ -35,16 +35,16 @@ group project/
 
 Keep the notebooks in the main folder: they use it as their working directory. Moving them breaks their paths.
 
-- [ ] Put `.gitignore`, `README.md`, `AI_USE.md` and `TODO.md` in the project folder.
-- [ ] Create the folders `R`, `report`, `slides` and `docs`, each with an empty file named `.gitkeep`.
+- [x] Put `.gitignore`, `README.md`, `AI_USE.md` and `TODO.md` in the project folder. (16 Oct)
+- [x] Create the folders `R`, `report`, `slides` and `docs`, each with an empty file named `.gitkeep`. (16 Oct)
 - [ ] Move the old files into a `_superseded` folder (ignored): `collect.py`, `01_collect.R`, `collector_setup_py.ipynb`, `01_collector_setup.ipynb`, `02_map_speedbands.R`.
-- [ ] Clear all notebook outputs and save.
-- [ ] Open a terminal in the project folder and run `git init -b main`, then `git add -n .` (this is a dry run that only lists files). **Stop** if `.Renviron`, `data_raw`, `data_processed` or `.venv` appear in the list.
-- [ ] Run `git add .`, then `git commit -m "Initial commit: collector, context data, processing, visuals"`.
-- [ ] On github.com, create a **private** repo. Don't tick "add README" or ".gitignore".
-- [ ] Run `git remote add origin https://github.com/<you>/<repo>.git`, then `git push -u origin main`.
+- [x] Clear all notebook outputs and save. (16 Oct; keep committing notebooks without outputs)
+- [x] Open a terminal in the project folder and run `git init -b main`, then `git add -n .` (this is a dry run that only lists files). **Stop** if `.Renviron`, `data_raw`, `data_processed` or `.venv` appear in the list. (16 Oct, mini PC)
+- [x] Run `git add .`, then `git commit -m "Initial commit: collector, context data, processing, visuals"`. (16 Oct)
+- [x] Create the GitHub repo: https://github.com/PressGO/slds-1.3. Made **public** on 16 Oct (team decision); check the course allows public repos before the report.
+- [x] Push to GitHub. (16 Oct, with `gh repo create`)
 - [ ] Add teammates as collaborators (Settings → Collaborators).
-- [ ] Check on github.com that no `.Renviron` and no data files were uploaded.
+- [x] Check that no `.Renviron`, no key and no data files were uploaded. (16 Oct: staged files scanned for both keys before each push)
 
 ### Sharing the data (not on GitHub)
 
@@ -53,67 +53,45 @@ Keep the notebooks in the main folder: they use it as their working directory. M
 
 ---
 
-## 2. Ubuntu mini PC runs the collector, so the desktop is free
+## 2. Collection on the Ubuntu mini PC
 
-The plan: run both machines side by side for 1–2 days, check the mini PC is complete, then stop the desktop collector. Don't stop the desktop first, or you'll leave a gap.
+**Decided 16 Oct (option C, `docs/COLLECTION_REVIEW_2026-10-16.md`):** the mini PC runs both collectors, each with its own LTA key, because LTA cuts a key off after about 4,000 calls in a clock hour. The desktop is a cold spare and stays off. Accepted risk: no backup machine while it is off.
 
-### Set up (about 20 minutes)
+| Service | Key | Collects | Output |
+|---|---|---|---|
+| `lta-collector` | `LTA_ACCOUNT_KEY` | whole network at each update, plus incidents, VMS, travel times, road works | `data_raw/` |
+| `lta-collector-expressway` | `LTA_ACCOUNT_KEY2` | the 58 expressway pages every 2 min | `data_raw_expressway/` |
 
-- [ ] Install Git and Python: `sudo apt update && sudo apt install -y git python3 python3-venv`
-- [ ] Clone the repo: `git clone https://github.com/<you>/<repo>.git ~/slds-1.3`
-- [ ] Create the key file by typing it in. Never copy it through chat or GitHub. Run `nano ~/slds-1.3/.Renviron`, add the lines below, then run `chmod 600 ~/slds-1.3/.Renviron`.
-  ```
-  LTA_ACCOUNT_KEY=<your key>
-  HC_PING_URL=https://hc-ping.com/<a NEW check for the mini PC>
-  ```
-- [ ] Test one pass: `cd ~/slds-1.3 && python3 analysis/lta_collector.py --once`. You should see `speedband_snapshots: 1` and an empty `last_error`.
-- [ ] Create the service file: `sudo nano /etc/systemd/system/lta-collector.service`, with the content below. Replace `<you>` with your Ubuntu user name (run `whoami` to see it).
-  ```ini
-  [Unit]
-  Description=SLDS 1.3 LTA collector
-  Wants=network-online.target
-  After=network-online.target
+Setup steps: `docs/LINUX_SETUP_FOR_CLAUDE_CODE.md`.
 
-  [Service]
-  User=<you>
-  WorkingDirectory=/home/<you>/slds-1.3
-  ExecStart=/usr/bin/python3 /home/<you>/slds-1.3/analysis/lta_collector.py
-  Restart=always
-  RestartSec=30
+### Done (16 Oct)
 
-  [Install]
-  WantedBy=multi-user.target
-  ```
-  With `Restart=always`, systemd restarts the collector after a crash or freeze-guard exit. With `WantedBy`, it starts at boot without anyone logging in.
-- [ ] Start it now and at every boot: `sudo systemctl daemon-reload && sudo systemctl enable --now lta-collector`
-- [ ] Check it: `systemctl status lta-collector` should say "active (running)". To watch it live, run `journalctl -u lta-collector -f` (Ctrl+C to stop watching).
-- [ ] Stop the machine from sleeping: `sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target`
+- [x] Project cloned to `~/slds-1.3`; `.Renviron` with both keys and both Healthchecks URLs (`chmod 600`).
+- [x] `lta-collector` service running since 12:07 (code from `60c74a2` since 13:06); `lta-collector-expressway` since 13:21. Both enabled at boot.
+- [x] Sleep, suspend and hibernate masked.
+- [x] Python environment for the notebooks (`setup_env.sh`), kernel "Python (SLDS 1.3)".
+- [x] Rate-limit fix (`deda600`, `60c74a2`) and expressway mode (`0a35c4c`).
+
+### Still to do on the mini PC
+
+- [ ] Confirm a full live hour: `~/slds-1.3/check.sh` shows about 12 fetches for `lta-collector`, about 30 for `lta-collector-expressway`, and no rate-limit errors.
+- [ ] Press **Test** on the e-mail integration of both Healthchecks checks.
+- [ ] Stop automatic updates until 27 Nov (Linux guide, Step 6): update once by hand, reboot, check both services, then disable `unattended-upgrades`, `apt-daily.timer`, `apt-daily-upgrade.timer` and hold snap refresh. Undo after 27 Nov.
+- [ ] `sudo apt install -y lm-sensors`, then `sensors`: CPU under ~70 °C at idle is fine.
 - [ ] If the BIOS has "Restore on AC power loss", set it to **Power On**.
+- [ ] Check free disk space with `df -h ~` once a week (whole network about 0.5 GB/day; expressway collector much less).
 
-### Keep updates from interrupting collection (until 27 Nov)
+### Desktop (cold spare)
 
-- [ ] Update once by hand now, while you're watching: `sudo apt update && sudo apt full-upgrade -y && sudo reboot`. After the reboot, check that `systemctl status lta-collector` says active.
-- [ ] Turn off automatic apt updates: `sudo systemctl disable --now unattended-upgrades apt-daily.timer apt-daily-upgrade.timer`
-- [ ] Hold snap auto-refresh: `sudo snap refresh --hold`
-- [ ] Optional, on the desktop version of Ubuntu: `sudo systemctl disable --now packagekit` stops the background update checker.
-- [ ] Install a temperature reader: `sudo apt install -y lm-sensors`, then run `sensors`. CPU under ~70 °C at idle is fine. The collector itself uses very little CPU.
-- [ ] Check what's using the CPU: `top`. Nothing should sit near 100% for long. If something does, that's what to look into (last time it was an update stuck in a loop).
-- [ ] Monthly is fine for manual updates during collection. Do them when you're at the machine, then check the service.
-- [ ] After 27 Nov: undo with `sudo systemctl enable --now unattended-upgrades apt-daily.timer apt-daily-upgrade.timer` and `sudo snap refresh --unhold`.
-- [ ] Check free disk space with `df -h ~`. Plan for at least what monitor cell 5 projects on the desktop by 27 Nov.
-
-### Switch over
-
-- [ ] After 24–48 h, compare the two machines. On the mini PC, check `cat ~/slds-1.3/data_raw/collector_status.json` and count today's files with `ls ~/slds-1.3/data_raw/speedbands/$(date +%F) | wc -l` (about 288 per full day). On the desktop, run monitor cell 5.
-- [ ] Safer option: keep the desktop collector running too, at least until the training weeks end (6 Nov). It costs nothing in your use of the desktop, and if one machine fails the other covers the gap.
-- [ ] If you do switch off the desktop, check first that the mini PC is complete, then stop the desktop collector in Command Prompt: `schtasks /End /TN SLDS_LTA_collector_247`, then `schtasks /Delete /TN SLDS_LTA_collector_247 /F`.
-- [ ] **Keep the desktop's `data_raw/`.** It holds 14 Oct up to the switch. Later, copy it next to the mini PC data as `data_raw_desktop/`. Processing will read both folders.
-- [ ] Pause the desktop's Healthchecks check, so it doesn't e-mail you about a machine you stopped on purpose.
+- [ ] Disable its watchdog task so it can't restart on its own, in an admin terminal: `Disable-ScheduledTask -TaskName SLDS_LTA_collector_247`.
+- [ ] Pause its Healthchecks check.
+- [ ] **Keep its `data_raw/`** (14 to 16 Oct). Copy it to the mini PC as `~/slds-1.3/data_raw_desktop/`; `04_process.ipynb` reads every `data_raw*/` folder and removes duplicates.
+- [ ] If it is ever needed again: `git pull` first, and use a key that no running collector uses.
 
 ### Weekly (from Wed 21 Oct)
 
-- [ ] Back up the mini PC's `data_raw/` to an external drive or a team-only Drive folder.
-- [ ] Health check: `systemctl status lta-collector` and the snapshot count.
+- [ ] Back up `data_raw/` and `data_raw_expressway/` to an external drive or a team-only Drive folder (never include `.Renviron`).
+- [ ] Run `~/slds-1.3/check.sh`.
 
 ---
 
@@ -130,7 +108,7 @@ Proposal doc: https://claude.ai/code/artifact/087debe2-18bc-4a9a-984a-f0087c9ad8
   - test 10–20 Nov;
   - leave one expressway out for the transfer test;
   - drop road works as a feature.
-- [ ] Log the decision with today's date in `docs/DECISIONS.md`.
+- [ ] Log the decision with today's date in `DECISIONS.md`.
 
 ### Numbers to put in the proposal
 
@@ -173,4 +151,4 @@ Proposal doc: https://claude.ai/code/artifact/087debe2-18bc-4a9a-984a-f0087c9ad8
 - [ ] Run the three data checks: do links chain end to start; total length per road; how often single links flicker.
 - [ ] Processing script: merge both collectors' data → segments → segment travel-time panel → rain and calendar.
 - [ ] R modelling (after 6 Nov): norms, labels, baselines, elastic net, random forest.
-- [ ] Keep the collector running until at least Fri 20 Nov 23:59.
+- [ ] Keep both collectors running until at least Fri 20 Nov 23:59 (Linux guide says 27 Nov, for the school-holiday stress test).

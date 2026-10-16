@@ -63,10 +63,12 @@ Output (under the project folder; never edit data_raw/)
   data_raw/log_feeds.csv        one row per feed poll (lets you rebuild what was live when)
 Raw files are JSON Lines, one line per API response; "body" holds the response text exactly.
 
-The key is read from .Renviron in the project folder (LTA_ACCOUNT_KEY=...), the same file
-the R scripts use. It is sent only in the request header and never written to disk.
+The key is read from .Renviron in the project folder (LTA_ACCOUNT_KEY=..., or the name given
+with --key-name), the same file the R scripts use. It is sent only in the request header and
+never written to disk; LTA error messages that echo it are masked as <KEY>.
 
-AI disclosure: drafted with Claude (Anthropic) on 14 Oct 2026; log in AI_USE.md.
+AI disclosure: drafted with Claude (Anthropic) on 14 Oct 2026, expressway mode 16 Oct;
+log in AI_USE.md.
 """
 
 from __future__ import annotations
@@ -150,10 +152,6 @@ def read_setting(proj: Path, name: str) -> str:
             if line.startswith(name + "="):
                 return line.split("=", 1)[1].strip().strip('"').strip("'")
     return os.environ.get(name, "").strip()
-
-
-def read_key(proj: Path) -> str:
-    return read_setting(proj, "LTA_ACCOUNT_KEY")
 
 
 class Pinger:

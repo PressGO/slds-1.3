@@ -40,17 +40,17 @@ The proposal is worth 5 of the 30 points, and "full score is given if all the ch
 - [x] Source check run with the key (13 Oct, 21:39): 315 requests, 0 failed. 143,787 links per snapshot, 2,598 of them expressway links; rainfall backfill works; holidays verified (§7).
 - [x] LTA API User Guide v6.10 (1 Oct 2026) saved to the project. It confirms the endpoint, the RoadCategory codes (1 = expressway) and the band → km/h mapping.
 - [x] Scope narrowed to expressways (category 1), because category 1 + 2 would be about 147 M rows (§4.3).
-- [x] Data pipeline written in Python and tested on simulated data (§12, `claude/PIPELINE.md`).
+- [x] Data pipeline written in Python and tested on simulated data (§12, `README.md`).
 - [x] Decision: no cloud syncing for now. The data stays on the collecting desktop (risk noted in §6.3).
 
 ### Still to do this week
 
-- [ ] **Start the 24/7 collector on the desktop:** `01_collector_monitor.ipynb`, cells 1–4 (cell 3 deletes the old 5-minute task if one was created). Keep the desktop awake (never sleep when plugged in).
+- [x] (14 Oct; moved to the Linux mini PC on 16 Oct, see §6.3 and §7) **Start the 24/7 collector on the desktop:** `01_collector_monitor.ipynb`, cells 1–4 (cell 3 deletes the old 5-minute task if one was created). Keep the desktop awake (never sleep when plugged in).
 - [ ] Check it the next morning: monitor notebook cell 5 (heartbeat under 2 min, about 12 snapshots per hour, no gap over 10 min).
 - [ ] Fill in team names in §9 and the proposal draft (§5.2). Everyone reads this file.
 - [ ] Send the instructor email in §11 (collection before approval, Python for collection, package due date, AI tools).
-- [ ] Create a private GitHub repo for the code (§12). Put `.Renviron` in `.gitignore` in the very first commit. Data stays out of GitHub.
-- [ ] Start `AI_USE.md` and log the Claude sessions so far: tool, date, purpose, representative prompts [Brief §5 p.3].
+- [x] (16 Oct: https://github.com/PressGO/slds-1.3, made public) Create a private GitHub repo for the code (§12). Put `.Renviron` in `.gitignore` in the very first commit. Data stays out of GitHub.
+- [x] (15 Oct) Start `AI_USE.md` and log the Claude sessions so far: tool, date, purpose, representative prompts [Brief §5 p.3].
 - [ ] **Thu 15 Oct, after ~24 h of collection:** run `get_context_data.py`, then `04_process.ipynb` and `03_visuals.ipynb`. Check that the expressway bands actually move during the day (time–space diagram) and count drops of 2+ bands. Fill the evidence line in the proposal: collector start date, snapshots so far, % complete.
 - [ ] **Thu 15 Oct:** finish the one-page draft (§5.2) and run the self-check (§5.3).
 - [ ] **Fri 16 Oct:** 30-minute team review; each member must be able to explain every line [Brief §2 p.1]. Export to PDF (A4, 12 pt) and check it is one page. Log AI-drafted text in `AI_USE.md`. Submit Friday night.
@@ -372,9 +372,9 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
 ### 6.1 Practices, starting now
 
 1. **Raw data is never edited.** The collector saves responses exactly as received (gzipped), writing each file under a temporary name and renaming it, so no file is ever half-written. Processing reads raw files and writes processed ones, and processed files can always be rebuilt (`04_process.ipynb`).
-2. **Self-healing collector.** Retries with back-off, consistency checks on every snapshot, one feed failing never stops the others, and a Windows watchdog task restarts it within 10 minutes after a crash or reboot (`claude/PIPELINE.md`).
-3. **Daily health check (2 minutes, data lead).** Monitor notebook cell 5: heartbeat, snapshots in the last 24 h, gaps, failures and projected disk use. Post one line in the team chat.
-4. **Backups (deferred).** For now the data lives only on the collecting desktop. Before the end of the training weeks (6 Nov), copy `data_raw/` to an external drive or a cloud folder at least weekly, and consider a second collector on a teammate's key (§6.3).
+2. **Self-healing collector.** Retries with back-off, consistency checks on every snapshot, one feed failing never stops the others, and a service manager restarts it after a crash or reboot: systemd within 30 s on the Linux mini PC (`docs/LINUX_SETUP_FOR_CLAUDE_CODE.md`), or the Windows watchdog task within 10 minutes. Healthchecks.io e-mails us if pings stop.
+3. **Daily health check (2 minutes, data lead).** `~/slds-1.3/check.sh` on the mini PC (both collectors: heartbeat, files today, last hour's fetches, errors, disk), or monitor notebook cell 5 on the desktop. Post one line in the team chat.
+4. **Backups.** Since 16 Oct both collectors run on the Linux mini PC (two keys, §6.3); the desktop holds 14–16 Oct and is a cold spare. Copy `data_raw/` and `data_raw_expressway/` to an external drive or a team-only cloud folder at least weekly from 21 Oct.
 5. **Pre-registration in `DECISIONS.md`.** Every frozen choice gets a date, a reason and an author. Changes are appended, never edited in place. This is our evidence that the outcome and metric were defined before models were compared [Brief §4 p.3].
 6. **One `config.yml`** (for the R modelling stage) holding dates, thresholds, horizon, *k*, seeds, paths and the API endpoint. Sensitivity runs and any changes the instructor asks for then become config edits, not code rewrites.
 7. **Test lock.** Test-week rows go to a separate file that only `90_final_test.R` reads. EDA and tuning scripts stop with an error if they ever see a date after 13 Nov.
@@ -400,9 +400,10 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
 
 | Risk | Early signal | Response |
 |---|---|---|
-| Collector downtime (desktop asleep, off, offline) | Monitor cell 5: heartbeat old, fewer than ~280 snapshots a day | Fix power settings; the watchdog restarts the collector. Document gaps, exclude affected rows, report % excluded by time of day |
-| Data lost with the desktop (disk failure, accident) | — | No sync for now (team decision, 14 Oct). Weekly copy of `data_raw/` to an external drive or cloud folder from 21 Oct at the latest; optional second collector |
-| Paging overlaps a 5-minute update | `log_speedbands.csv`: status `ok_flagged`, mixed `lastUpdatedTime` | Already handled: the collector probes every minute, fetches pages with 6 threads (~10 s) and refetches once if LTA updated mid-fetch |
+| Collector downtime (mini PC off, offline, or a service stopped) | Healthchecks e-mail; `check.sh`: heartbeat old, fewer than ~12 fetches an hour | systemd restarts the services and sleep is masked; the desktop is a cold spare. Document gaps, exclude affected rows, report % excluded by time of day |
+| Data lost with the mini PC (disk failure, accident) | — | Weekly copy of `data_raw/` and `data_raw_expressway/` to an external drive or cloud folder from 21 Oct at the latest; the desktop keeps 14–16 Oct |
+| LTA rate limit (found 16 Oct) | `probe_failed` / `fetch_failed` with "Rate limit quota violation" | Unpublished limit of about 4,000 calls per key per clock hour, reset on the hour. Fixed 16 Oct: each update fetched once, no retries on rate-limit faults, pause to the hour; one key per collector (`docs/COLLECTION_REVIEW_2026-10-16.md`) |
+| Pages carry different update times | `log_speedbands.csv`: nearly every fetch `ok_flagged`, mixed `lastUpdatedTime` | Not a timing glitch: LTA serves pages from out-of-sync servers, so refetching never gives a clean snapshot (refetching was removed 16 Oct; it exhausted the rate limit). Each row keeps its own `last_updated`, which is reliable (9.7 M repeats, 0 conflicts), and processing uses it as *t*. To keep the expressway series complete, a second collector fetches the 58 expressway pages every 2 min (option C, decided 16 Oct) |
 | LinkIDs change | Registry shows new or vanished IDs | Match by coordinates; keep links present in ≥ 95% of snapshots |
 | Too few unusual events | Only a few hundred onset episodes in the training weeks | Add major-arterial (category 2) links, use the 1-band rule or a 10-minute horizon, and document the change in `DECISIONS.md` |
 | Endpoint or schema change | Schema warning in the log | Update the path in config; parse fields by name |
@@ -415,11 +416,11 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
 
 ## 7. Data sources
 
-Full details: `claude/data_sources_check.md` (checked live 13 Oct) and `claude/PIPELINE.md`.
+Source checks: `00_check_sources.ipynb` (R, run 13 Oct) and `00_check_sources_python.ipynb` (Python, run 16 Oct); both 315 requests, 0 failed. Collection details and LTA's feed behaviour: `docs/COLLECTION_REVIEW_2026-10-16.md`.
 
 | Dataset | Role | How we get it | Key? | Status |
 |---|---|---|---|---|
-| LTA Traffic Speed Bands (API guide §2.19) | Outcome and main features | `lta_collector.py`: probe every minute, full fetch at each LTA update (~5 min) | **Yes**, our LTA key | ✅ Tested 13 Oct: 143,787 links, 288 pages, 0 failures |
+| LTA Traffic Speed Bands (API guide §2.19) | Outcome and main features | `lta_collector.py`: probe every minute, full fetch at each LTA update (~5 min); plus `--mode expressway` with a second key: the 58 expressway pages every 2 min | **Yes**, two LTA keys (one per collector; rate limit ~4,000 calls/key/hour) | ✅ Tested 13 Oct: 143,787 links, 288 pages, 0 failures. Both collectors on the mini PC since 16 Oct |
 | LTA Traffic Incidents (§2.18) | Label audit, failure cases | `lta_collector.py`: every 2 min, saved on change | Same key | ✅ Tested; messages carry a report time, e.g. "(13/10)21:34" |
 | LTA VMS/EMAS (§2.20), Estimated Travel Times (§2.13) | Extra signals, fallback | `lta_collector.py`: every 2 / 5 min, saved on change | Same key | ✅ In collector |
 | LTA Approved Road Works (§2.16), Planned Road Openings (§2.15) | Planned disruptions (known in advance) | `lta_collector.py`: once a day | Same key | ✅ In collector |
@@ -549,7 +550,9 @@ This follows Brief §6.2 p.4, plus planning files of our own.
 slds-1.3-congestion/
 ├── README.md                  how to reproduce; licence notice
 ├── PROJECT_PLAN.md            this file
+├── TODO.md                    current to-do list
 ├── DECISIONS.md               dated, frozen definitions and any changes
+├── check.sh                   health check of both Linux collectors
 ├── CONTRIBUTIONS.md           who did what, updated weekly
 ├── AI_USE.md                  tool, date, purpose, prompts, how checked
 ├── .Renviron                  API keys: never committed
@@ -560,14 +563,16 @@ slds-1.3-congestion/
 │   ├── lta_collector.py       24/7 LTA collector (Python standard library)
 │   ├── get_context_data.py    NEA rainfall + calendar (MOM, MOE, F1)
 │   ├── 00_check_sources.R     one-off source check (done 13 Oct)
+│   ├── 00_check_sources.py    the same check in Python (done 16 Oct)
 │   └── (R modelling scripts: 05_labels.R, 06_models.R, 07_validate.R, 90_final_test.R, run_all.R)
-├── data_raw/                  collector output; large, not in GitHub
+├── data_raw/                  whole-network collector output; large, not in GitHub
+├── data_raw_expressway/       expressway collector output; not in GitHub
 ├── data_processed/            Parquet tables for R (arrow::open_dataset)
 ├── R/                         R functions: norms, features, metrics
 ├── figures/                   produced by code only
 ├── report/                    report.qmd → PDF
 ├── slides/                    slides source → PDF
-└── docs/                      LTA API guide, course PDFs, defence.md
+└── docs/                      Linux setup, collection review, LTA API guide, course PDFs, defence.md
 ```
 
 Superseded and not to be used: `collect.py`, `01_collect.R`, `collector_setup_py.ipynb`, `01_collector_setup.ipynb`, `02_map_speedbands.R`.
@@ -582,6 +587,7 @@ First entries for `DECISIONS.md`:
 2026-10-14  Population: RoadCategory 1 (expressways, 2,598 links on 13 Oct), presence >= 95%; weekdays excl. PH; 06:00-22:00
 2026-10-14  Time t = LTA lastUpdatedTime (fallback: retrieval time)
 2026-10-14  Collection: lta_collector.py (Python) on the desktop; no cloud sync for now, weekly backup from 21 Oct
+2026-10-16  Collection (supersedes 14 Oct): both collectors on the Linux mini PC, one LTA key each: whole network per update + expressway pages every 2 min; desktop cold spare
 2026-10-13  Split: train 13 Oct-6 Nov; validate 7-13 Nov; test 14-20 Nov (locked)
 2026-10-13  Primary metric: PR-AUC on onset rows, test week; 95% day-block bootstrap
 ```

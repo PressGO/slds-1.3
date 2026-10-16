@@ -8,12 +8,13 @@ Hand this whole file to Claude Code on the Linux PC, for example: "Read LINUX_SE
 
 - This is a university project (SUTD 42.510, topic 1.3). It collects LTA DataMall traffic data (Singapore).
 - `lta_collector.py` is a finished, tested collector that uses only the Python standard library.
-  - It polls the Traffic Speed Bands API every 60 s and saves a full snapshot when LTA updates (about every 5 min).
+  - It probes the Traffic Speed Bands API every 60 s and fetches all 288 pages once per LTA update (about every 5 min), when page 1's `lastUpdatedTime` moves forward.
   - It also saves incidents, VMS and travel times when they change, and road works and openings once a day.
-  - It retries failures, writes files atomically, and allows only one copy (file lock).
+  - It retries failures, writes files atomically, and allows only one copy per output folder (file lock).
   - It has a freeze guard: if its loop stalls for 20 min it exits with code 3, so the service manager should restart it.
   - It pings Healthchecks.io after each snapshot if `HC_PING_URL` is set.
-- A Windows desktop already runs the same collector. This Linux PC is a **second, independent collector**, so a failure on one machine doesn't leave a gap. Both machines use the same LTA key. That is fine: together about 175k calls/day, against LTA's 10M/day limit.
+- **Rate limit.** LTA's published limit is 10 M calls/day, but in practice each key is cut off after about 4,000 calls in a clock hour (HTTP 500 "Rate limit quota violation", resetting on the hour). The collector does not retry these and pauses until the next hour. Never run two collectors on the same key.
+- **Current set-up (decided 16 Oct 2026, option C in `docs/COLLECTION_REVIEW_2026-10-16.md`):** this Linux PC runs both collectors, each with its own key: `lta-collector` (whole network, `LTA_ACCOUNT_KEY`, Step 4) and `lta-collector-expressway` (expressway pages every 2 min, `LTA_ACCOUNT_KEY2`, Step 4b). The Windows desktop is a cold spare and stays off.
 - The data can never be re-downloaded (LTA serves only the current state), so reliability matters more than anything else.
 - Collection must run until at least **Fri 27 Nov 2026**.
 
@@ -29,21 +30,21 @@ Hand this whole file to Claude Code on the Linux PC, for example: "Read LINUX_SE
 
 ## Step 1: Project folder, code and Python
 
-The user copies `slds-1.3.zip` to this PC (USB, or a download from the chat). It holds the complete project repo, with the course's folder structure and no data:
+Get the code from GitHub (https://github.com/PressGO/slds-1.3; done 16 Oct 2026). It holds the complete project with the course's folder structure and no data:
 
 ```
 slds-1.3/
-├── README.md  AI_USE.md  TODO.md  PROJECT_PLAN.md  .gitignore
+├── README.md  AI_USE.md  TODO.md  PROJECT_PLAN.md  DECISIONS.md  .gitignore  check.sh
 ├── requirements.txt  setup_env.bat  setup_env.sh   (notebook environment: Windows / Linux)
-├── 00_check_sources.ipynb  01_collector_monitor.ipynb  03_visuals.ipynb  04_process.ipynb
-├── analysis/   lta_collector.py  get_context_data.py  00_check_sources.R
+├── 00_check_sources.ipynb  00_check_sources_python.ipynb  01_collector_monitor.ipynb  03_visuals.ipynb  04_process.ipynb
+├── analysis/   lta_collector.py  get_context_data.py  00_check_sources.R  00_check_sources.py
 ├── R/  report/  slides/                      (empty for now, .gitkeep)
-└── docs/       LINUX_SETUP_FOR_CLAUDE_CODE.md (this file)
+└── docs/       LINUX_SETUP_FOR_CLAUDE_CODE.md (this file)  COLLECTION_REVIEW_2026-10-16.md
 ```
 
 ```bash
-sudo apt update && sudo apt install -y python3 unzip git
-cd ~ && unzip slds-1.3.zip          # creates ~/slds-1.3
+sudo apt update && sudo apt install -y python3 git
+git clone https://github.com/PressGO/slds-1.3.git ~/slds-1.3
 cd ~/slds-1.3 && ls -la
 grep -c "HC_PING_URL" analysis/lta_collector.py   # must be > 0 (correct version)
 python3 --version                                 # needs 3.9+
@@ -230,34 +231,19 @@ df -h ~                                       # free space
 
 ## Step 8: Daily health-check command
 
-Create `~/slds-1.3/check.sh` and make it executable (`chmod +x`):
+`check.sh` is in the repo. It is read-only and reports on both services: active or not, files saved today, heartbeat age, last error, the last hour's speed-band fetches by status, disk use and CPU temperature.
 
 ```bash
-#!/usr/bin/env bash
-# Daily health check for the LTA collector. Read-only.
-cd "$(dirname "$0")"
-echo "Service: $(systemctl is-active lta-collector)"
-echo "Today's snapshots: $(ls data_raw/speedbands/$(date +%F) 2>/dev/null | wc -l)  (about 12 per hour, 288 per full day)"
-python3 - <<'EOF'
-import json, datetime as dt
-s = json.load(open("data_raw/collector_status.json"))
-beat = dt.datetime.strptime(s["last_heartbeat"], "%Y-%m-%dT%H:%M:%S%z")
-age = (dt.datetime.now(dt.timezone.utc) - beat).total_seconds() / 60
-print(f"Heartbeat: {age:.1f} min ago ({'OK' if age < 2 else 'PROBLEM'})")
-print("Started:", s.get("started"), "| Today:", s.get("today"))
-print("Last error:", s.get("last_error"))
-EOF
-du -sh data_raw 2>/dev/null
-sensors 2>/dev/null | grep -iE 'package|tctl|core 0' | head -3
+~/slds-1.3/check.sh
 ```
 
-Run it with `~/slds-1.3/check.sh`.
+A healthy hour: `lta-collector` about 12 `ok`/`ok_flagged` rows; `lta-collector-expressway` about 30 rows; no `probe_failed` or `fetch_failed`; heartbeats under 2 minutes.
 
 ## Step 9: Final checks (report results to the user)
 
-- [ ] `systemctl is-enabled lta-collector` prints `enabled`. `systemctl is-active lta-collector` prints `active`.
+- [ ] `systemctl is-enabled lta-collector lta-collector-expressway` prints `enabled` twice; `systemctl is-active` on both prints `active` twice.
 - [ ] After 15 minutes, `check.sh` shows 2–3 new snapshots and a heartbeat under 2 minutes.
-- [ ] The Healthchecks check is green.
+- [ ] Both Healthchecks checks are green.
 - [ ] `systemctl status sleep.target` is masked.
 - [ ] Automatic updates are disabled.
 - [ ] Test the restart: `sudo systemctl kill lta-collector`, wait 40 s, then `systemctl is-active lta-collector` prints `active` again.
@@ -267,41 +253,21 @@ Run it with `~/slds-1.3/check.sh`.
 
 | Task | Command |
 |---|---|
-| Is it running? | `systemctl status lta-collector` |
-| Live log | `journalctl -u lta-collector -f` (Ctrl+C stops watching, not the collector) |
-| Collector's own log | `tail -n 30 ~/slds-1.3/data_raw/logs/collector.log` |
-| Restart | `sudo systemctl restart lta-collector` |
-| Stop for good (after 27 Nov) | `sudo systemctl disable --now lta-collector` |
+| Are they running? | `systemctl status lta-collector lta-collector-expressway` |
 | Health check | `~/slds-1.3/check.sh` |
+| Live log | `journalctl -u lta-collector -f` or `-u lta-collector-expressway -f` (Ctrl+C stops watching, not the collector) |
+| Collectors' own logs | `tail -n 30 ~/slds-1.3/data_raw/logs/collector.log` and `~/slds-1.3/data_raw_expressway/logs/collector.log` |
+| Restart both (e.g. after `git pull`) | `sudo systemctl restart lta-collector lta-collector-expressway` |
+| Stop for good (after 27 Nov) | `sudo systemctl disable --now lta-collector lta-collector-expressway` |
 
-## Step 10: Put the project on GitHub (private repo)
+## Step 10: GitHub (done 16 Oct 2026)
 
-Do this only after Step 9 passes. The collector keeps running; Git ignores `data_raw/` and `.Renviron`.
+The repo is https://github.com/PressGO/slds-1.3 (public). Git ignores `.Renviron`, `.venv/`, `data_raw/`, `data_raw_*/` and `data_processed/`. Before every commit, check that no staged file contains a key: `sed -n 's/^LTA_ACCOUNT_KEY=//p' .Renviron | tr -d "\"' \r" | git grep --cached -lF -f -` must print nothing (repeat with `LTA_ACCOUNT_KEY2`).
 
-```bash
-sudo apt install -y gh
-gh auth login            # user follows the prompts: GitHub.com → HTTPS → log in with a web browser
-cd ~/slds-1.3
-git config --global user.name  "<user's name>"     # ask the user
-git config --global user.email "<user's GitHub email>"
-git init -b main
-git add -n .             # dry run: show the list to the user
-```
-
-**Stop if the list contains `.Renviron`, anything under `data_raw/`, `check.sh` output, or any data file.** The expected list is the files in Step 1, plus `check.sh`, which is fine to commit (it holds no secrets).
-
-```bash
-git add .
-git commit -m "Initial commit: LTA collector, context data, processing and visual notebooks"
-gh repo create slds-1.3 --private --source=. --push
-git status               # expect "nothing to commit, working tree clean"
-```
-
-Then:
-- Confirm on github.com that the repo is **private** and holds no `.Renviron` or `data_raw`.
-- Remind the user to add teammates under Settings → Collaborators.
+To update the code on this PC: `cd ~/slds-1.3 && git pull`, then restart both services.
 
 ## Later (not part of this task)
 
-- From now on, the Windows PC and the laptop get the code with `git clone`. On the Windows PC, keep the existing folder (it holds the data and `.Renviron`).
-- Once a week, back up `~/slds-1.3/data_raw/` to an external drive. Processing will later merge the Linux and Windows data.
+- The desktop is a cold spare: keep its existing folder (it holds data from 14 to 16 Oct and its `.Renviron`). To use it again, `git pull` there first, and never run it on a key that a running collector already uses.
+- Copy the desktop's `data_raw/` to this PC as `~/slds-1.3/data_raw_desktop/`. `04_process.ipynb` reads every `data_raw*/` folder and removes duplicates.
+- Once a week, back up `~/slds-1.3/data_raw/` and `~/slds-1.3/data_raw_expressway/` to an external drive.
