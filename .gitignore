@@ -35,5 +35,6 @@ Thumbs.db
 desktop.ini
 .DS_Store
 
-# Personal to-do list: kept locally, not shared
+# Kept locally, not shared: personal to-do list; 16 Oct collection review (summarised in DECISIONS.md)
 TODO.md
+docs/COLLECTION_REVIEW_2026-10-16.md

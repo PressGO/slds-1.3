@@ -14,7 +14,7 @@ Hand this whole file to Claude Code on the Linux PC, for example: "Read LINUX_SE
   - It has a freeze guard: if its loop stalls for 20 min it exits with code 3, so the service manager should restart it.
   - It pings Healthchecks.io after each snapshot if `HC_PING_URL` is set.
 - **Rate limit.** LTA's published limit is 10 M calls/day, but in practice each key is cut off after about 4,000 calls in a clock hour (HTTP 500 "Rate limit quota violation", resetting on the hour). The collector does not retry these and pauses until the next hour. Never run two collectors on the same key.
-- **Current set-up (decided 16 Oct 2026, option C in `docs/COLLECTION_REVIEW_2026-10-16.md`):** this Linux PC runs both collectors, each with its own key: `lta-collector` (whole network, `LTA_ACCOUNT_KEY`, Step 4) and `lta-collector-expressway` (expressway pages every 2 min, `LTA_ACCOUNT_KEY2`, Step 4b). The Windows desktop is a cold spare and stays off.
+- **Current set-up (decided 16 Oct 2026, option C, see `DECISIONS.md`):** this Linux PC runs both collectors, each with its own key: `lta-collector` (whole network, `LTA_ACCOUNT_KEY`, Step 4) and `lta-collector-expressway` (expressway pages every 2 min, `LTA_ACCOUNT_KEY2`, Step 4b). The Windows desktop is a cold spare and stays off.
 - The data can never be re-downloaded (LTA serves only the current state), so reliability matters more than anything else.
 - Collection must run until at least **Fri 27 Nov 2026**.
 
@@ -39,7 +39,7 @@ slds-1.3/
 ├── 00_check_sources.ipynb  00_check_sources_python.ipynb  01_collector_monitor.ipynb  03_visuals.ipynb  04_process.ipynb
 ├── analysis/   lta_collector.py  get_context_data.py  00_check_sources.R  00_check_sources.py
 ├── R/  report/  slides/                      (empty for now, .gitkeep)
-└── docs/       LINUX_SETUP_FOR_CLAUDE_CODE.md (this file)  COLLECTION_REVIEW_2026-10-16.md
+└── docs/       LINUX_SETUP_FOR_CLAUDE_CODE.md (this file)
 ```
 
 ```bash
@@ -139,7 +139,7 @@ journalctl -u lta-collector -n 30 --no-pager
 
 ## Step 4b: Second service, expressway collector (added 16 Oct 2026)
 
-Option C from `docs/COLLECTION_REVIEW_2026-10-16.md`, run on this PC: a second copy of the same script fetches only the 58 pages that hold the expressway links, every 2 minutes, with its own key, into `data_raw_expressway/`. It has its own lock, so it runs alongside `lta-collector`.
+Option C (`DECISIONS.md`, 16 Oct), run on this PC: a second copy of the same script fetches only the 58 pages that hold the expressway links, every 2 minutes, with its own key, into `data_raw_expressway/`. It has its own lock, so it runs alongside `lta-collector`.
 
 `.Renviron` needs `LTA_ACCOUNT_KEY2=` (a key from a different LTA account) and, for alerts, `HC_PING_URL2=` (a separate Healthchecks check, e.g. "SLDS expressway collector", period 5 min, grace 15 min).
 

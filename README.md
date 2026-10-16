@@ -18,8 +18,7 @@ Status, 16 Oct 2026: LTA traffic data collected 24/7 since 14 Oct 2026 (desktop 
 | `03_visuals.ipynb` | Maps, time–space diagrams, share of links by speed band | Cell 1, then any plot cell |
 | `analysis/00_check_sources.R`, `00_check_sources.ipynb` | One-off check of every source (run 13 Oct 2026: 315 requests, 0 failed) | Done |
 | `analysis/00_check_sources.py`, `00_check_sources_python.ipynb` | The same check in Python (standard library only); same outputs in `data_raw/source_check/` (run 16 Oct 2026: 315 requests, 0 failed) | `python3 analysis/00_check_sources.py`, or the notebook |
-| `DECISIONS.md` | Dated, frozen design and collection decisions; append only | Read before changing anything |
-| `docs/COLLECTION_REVIEW_2026-10-16.md` | Why and how collection changed on 16 Oct: LTA's rate limit, out-of-sync pages, options | Read once |
+| `DECISIONS.md` | Dated, frozen design and collection decisions (append only), and the background to the 16 Oct collection change: LTA's rate limit and out-of-sync pages | Read before changing anything |
 | `docs/LINUX_SETUP_FOR_CLAUDE_CODE.md` | Step-by-step setup of both collectors on the Linux PC | Once per machine |
 | `setup_env.bat` (Windows), `setup_env.sh` (Linux), `requirements.txt` | Creates `.venv` with polars, numpy, matplotlib and Jupyter, and the kernel "Python (SLDS 1.3)" | Once per machine |
 

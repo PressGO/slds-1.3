@@ -402,7 +402,7 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
 |---|---|---|
 | Collector downtime (mini PC off, offline, or a service stopped) | Healthchecks e-mail; `check.sh`: heartbeat old, fewer than ~12 fetches an hour | systemd restarts the services and sleep is masked; the desktop is a cold spare. Document gaps, exclude affected rows, report % excluded by time of day |
 | Data lost with the mini PC (disk failure, accident) | — | Weekly copy of `data_raw/` and `data_raw_expressway/` to an external drive or cloud folder from 21 Oct at the latest; the desktop keeps 14–16 Oct |
-| LTA rate limit (found 16 Oct) | `probe_failed` / `fetch_failed` with "Rate limit quota violation" | Unpublished limit of about 4,000 calls per key per clock hour, reset on the hour. Fixed 16 Oct: each update fetched once, no retries on rate-limit faults, pause to the hour; one key per collector (`docs/COLLECTION_REVIEW_2026-10-16.md`) |
+| LTA rate limit (found 16 Oct) | `probe_failed` / `fetch_failed` with "Rate limit quota violation" | Unpublished limit of about 4,000 calls per key per clock hour, reset on the hour. Fixed 16 Oct: each update fetched once, no retries on rate-limit faults, pause to the hour; one key per collector (`DECISIONS.md`, 16 Oct) |
 | Pages carry different update times | `log_speedbands.csv`: nearly every fetch `ok_flagged`, mixed `lastUpdatedTime` | Not a timing glitch: LTA serves pages from out-of-sync servers, so refetching never gives a clean snapshot (refetching was removed 16 Oct; it exhausted the rate limit). Each row keeps its own `last_updated`, which is reliable (9.7 M repeats, 0 conflicts), and processing uses it as *t*. To keep the expressway series complete, a second collector fetches the 58 expressway pages every 2 min (option C, decided 16 Oct) |
 | LinkIDs change | Registry shows new or vanished IDs | Match by coordinates; keep links present in ≥ 95% of snapshots |
 | Too few unusual events | Only a few hundred onset episodes in the training weeks | Add major-arterial (category 2) links, use the 1-band rule or a 10-minute horizon, and document the change in `DECISIONS.md` |
@@ -416,7 +416,7 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
 
 ## 7. Data sources
 
-Source checks: `00_check_sources.ipynb` (R, run 13 Oct) and `00_check_sources_python.ipynb` (Python, run 16 Oct); both 315 requests, 0 failed. Collection details and LTA's feed behaviour: `docs/COLLECTION_REVIEW_2026-10-16.md`.
+Source checks: `00_check_sources.ipynb` (R, run 13 Oct) and `00_check_sources_python.ipynb` (Python, run 16 Oct); both 315 requests, 0 failed. Collection decisions and LTA's feed behaviour: `DECISIONS.md` (16 Oct entries and background).
 
 | Dataset | Role | How we get it | Key? | Status |
 |---|---|---|---|---|
@@ -571,7 +571,7 @@ slds-1.3-congestion/
 ├── figures/                   produced by code only
 ├── report/                    report.qmd → PDF
 ├── slides/                    slides source → PDF
-└── docs/                      Linux setup, collection review, LTA API guide, course PDFs, defence.md
+└── docs/                      Linux setup, LTA API guide, course PDFs, defence.md
 ```
 
 Superseded and not to be used: `collect.py`, `01_collect.R`, `collector_setup_py.ipynb`, `01_collector_setup.ipynb`, `02_map_speedbands.R`.
