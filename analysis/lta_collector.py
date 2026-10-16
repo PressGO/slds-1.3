@@ -26,7 +26,7 @@ What it collects (LTA DataMall API User Guide v6.10)
   Est. Travel Times (2.13)     every 5 min, saved when the content changes
   Approved Road Works (2.16)   once a day
   Planned Road Openings (2.15) once a day
-  Flood Alerts (2.30, PUB)     expressway mode only: every 3 min, saved when the content changes.
+  Flood Alerts (2.30, PUB)     expressway mode only: every 5 min, saved when the content changes.
                                For checking labels and explaining failures, not a model feature;
                                past alerts can't be downloaded later.
 
@@ -105,7 +105,7 @@ FEEDS = {  # name: (path, poll interval in seconds)
     "travel_times": ("EstTravelTimes", 300),
 }
 EXPRESS_FEEDS = {  # extra feeds polled by the expressway-mode collector (second key)
-    "flood_alerts": ("PubFloodAlerts", 180),
+    "flood_alerts": ("PubFloodAlerts", 300),   # LTA updates every 3 min; 5 min matches the speed-band grid
 }
 ALL_FEEDS = {**FEEDS, **EXPRESS_FEEDS}
 DAILY_FEEDS = {"roadworks": "RoadWorks", "road_openings": "RoadOpenings"}
