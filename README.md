@@ -1,0 +1,50 @@
+# Recurring or unusual? Early warning of abnormal slowdowns on Singapore expressways
+
+42.510 Statistical Learning for Data Science (SUTD, 2026), catalog topic 1.3.
+Team: [Name 1], [Name 2], [Name 3], [Name 4].
+
+Status, 15 Oct 2026: LTA traffic data collected 24/7 since 14 Oct 2026. Proposal due 17 Oct; no modelling until the proposal is approved (Brief §6.1).
+
+## Files
+
+| Path | What it does | How to run |
+|---|---|---|
+| `analysis/lta_collector.py` | Collects LTA DataMall feeds 24/7: Traffic Speed Bands at every LTA update (about every 5 min), incidents and VMS (every 2 min), estimated travel times (every 5 min), road works and road openings (daily). Python standard library only. | In the background, set up by `01_collector_monitor.ipynb` |
+| `01_collector_monitor.ipynb` | Creates the Windows scheduled task that keeps the collector running; daily health check; stop. | Cells 1–4 once per machine; cell 5 daily |
+| `analysis/get_context_data.py` | NEA 5-minute rainfall (downloaded by date), MOM public holidays, MOE school terms and F1 closure dates, written to `data_processed/` | `.venv\Scripts\python analysis\get_context_data.py` |
+| `04_process.ipynb` | Raw files → link registry, expressway speed-band panel, quality report, incidents, analysis panel (Parquet) | Top to bottom |
+| `03_visuals.ipynb` | Maps, time–space diagrams, share of links by speed band | Cell 1, then any plot cell |
+| `analysis/00_check_sources.R`, `00_check_sources.ipynb` | One-off check of every source (run 13 Oct 2026: 315 requests, 0 failed) | Done |
+| `analysis/00_check_sources.py`, `00_check_sources_python.ipynb` | The same check in Python (standard library only); same outputs in `data_raw/source_check/` (run 16 Oct 2026: 315 requests, 0 failed) | `python3 analysis/00_check_sources.py`, or the notebook |
+| `setup_env.bat` (Windows), `setup_env.sh` (Linux), `requirements.txt` | Creates `.venv` with polars, numpy, matplotlib and Jupyter, and the kernel "Python (SLDS 1.3)" | Once per machine |
+
+The notebooks sit in the project folder because they use it as their working directory.
+
+Planned: processing into ~1 km expressway segments, and the modelling scripts in R (after approval).
+
+## Setup on a new machine
+
+1. Install Python 3.10 or newer, then run `setup_env.bat` (Windows) or `./setup_env.sh` (Linux). This is only needed for the notebooks; the collector needs no packages.
+2. Create `.Renviron` in the project folder. It is excluded by `.gitignore`; never commit it or paste its contents anywhere.
+
+   ```
+   LTA_ACCOUNT_KEY=<LTA DataMall key>
+   HC_PING_URL=https://hc-ping.com/<check id>
+   DATAGOVSG_API_KEY=<data.gov.sg key>
+   ```
+
+   `HC_PING_URL` (e-mail alert when collection stops) and `DATAGOVSG_API_KEY` (higher rate limit) are optional.
+3. To collect on Windows: run `01_collector_monitor.ipynb` cells 1–4, and keep the machine awake and signed in. On Linux: a systemd service; see `docs/LINUX_SETUP_FOR_CLAUDE_CODE.md`. Collection needs no Python packages.
+4. To process: run `get_context_data.py`, then `04_process.ipynb`.
+
+## Data
+
+Not in this repository. `data_raw/` holds the collector output (several GB, never edited); `data_processed/` is rebuilt from it. LTA serves only the current state, so raw snapshots cannot be downloaded again: back up `data_raw/` separately.
+
+## Licence notice
+
+Contains information from LTA DataMall (Traffic Speed Bands, Traffic Incidents, VMS/EMAS, Estimated Travel Times, Approved Road Works, Planned Road Openings), accessed from 13 Oct 2026, and from NEA rainfall and MOM public holiday data accessed from data.gov.sg, which are made available under the terms of the Singapore Open Data Licence version 1.0 (https://data.gov.sg/open-data-licence).
+
+## AI use
+
+See `AI_USE.md`.
