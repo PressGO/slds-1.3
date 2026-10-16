@@ -136,6 +136,44 @@ systemctl status lta-collector --no-pager    # expect "active (running)"
 journalctl -u lta-collector -n 30 --no-pager
 ```
 
+## Step 4b: Second service, expressway collector (added 16 Oct 2026)
+
+Option C from `docs/COLLECTION_REVIEW_2026-10-16.md`, run on this PC: a second copy of the same script fetches only the 58 pages that hold the expressway links, every 2 minutes, with its own key, into `data_raw_expressway/`. It has its own lock, so it runs alongside `lta-collector`.
+
+`.Renviron` needs `LTA_ACCOUNT_KEY2=` (a key from a different LTA account) and, for alerts, `HC_PING_URL2=` (a separate Healthchecks check, e.g. "SLDS expressway collector", period 5 min, grace 15 min).
+
+Test once: `python3 analysis/lta_collector.py --once --mode expressway --key-name LTA_ACCOUNT_KEY2 --hc-name HC_PING_URL2`. It should log "page map rebuilt: 2598 expressway links on 58 of 288 pages".
+
+Create `/etc/systemd/system/lta-collector-expressway.service` (replace `USER`):
+
+```ini
+[Unit]
+Description=SLDS 1.3 LTA collector, expressway pages (second key)
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=USER
+WorkingDirectory=/home/USER/slds-1.3
+ExecStart=/usr/bin/python3 /home/USER/slds-1.3/analysis/lta_collector.py --mode expressway --key-name LTA_ACCOUNT_KEY2 --hc-name HC_PING_URL2
+Restart=always
+RestartSec=30
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now lta-collector-expressway
+systemctl status lta-collector-expressway --no-pager
+```
+
+`~/slds-1.3/check.sh` reports on both services.
+
 ## Step 5: Never sleep, suspend or hibernate
 
 ```bash

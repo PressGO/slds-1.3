@@ -4,6 +4,18 @@ Runs continuously until stopped. Standard library only (Python 3.9+).
 
     python analysis/lta_collector.py           # run forever (Ctrl+C to stop)
     python analysis/lta_collector.py --once    # one pass of every feed, then exit (testing)
+    python analysis/lta_collector.py --mode expressway --key-name LTA_ACCOUNT_KEY2 --hc-name HC_PING_URL2
+
+Modes
+  full (default)  everything below, saved in data_raw/.
+  expressway      speed bands only, for the expressway links (RoadCategory 1), saved in
+                  data_raw_expressway/ with its own lock, log, state and status. A full fetch maps
+                  which pages hold expressway links (58 of 288 on 16 Oct); after that only those
+                  pages are fetched, every --every seconds (default 120), and only pages whose
+                  lastUpdatedTime changed are saved. Because LTA's pages lag each other by minutes,
+                  this catches updates that one fetch per update misses. The map is rebuilt every
+                  6 hours and whenever an expressway link is missing from the mapped pages.
+                  Use a second key: LTA's rate limit (about 4,000 calls an hour) is per key.
 
 What it collects (LTA DataMall API User Guide v6.10)
   Traffic Speed Bands (2.19)   whole network (~144k links). Probed every minute; when LTA's
@@ -102,6 +114,9 @@ BACKOFF_S = (2, 5, 15)        # waits between the 4 attempts of one request
 HEARTBEAT_EVERY_S = 30
 STALL_LIMIT_S = 1200          # freeze guard: exit if the loop has not ticked for 20 minutes
 FAIL_ALERT_AFTER = 10         # consecutive failed speed-band checks before a /fail ping
+EXPRESS_EVERY_S = 120         # expressway mode: seconds between fetches of the mapped pages
+EXPRESS_CATEGORY = "1"        # RoadCategory of expressways (API guide 2.19)
+MAP_MAX_AGE_S = 6 * 3600      # expressway mode: rebuild the page map with a full fetch this often
 
 SGT = timezone(timedelta(hours=8))   # Singapore: no daylight saving
 SB_LOG_FIELDS = ["retrieved_at", "last_updated", "status", "pages", "records", "seconds",
@@ -323,14 +338,16 @@ def check_snapshot(pages: list[dict]) -> tuple[list[str], int, str]:
 
 class Collector:
     def __init__(self, proj: Path, fetcher: Fetcher, pinger: Optional["Pinger"] = None,
-                 exit_fn: Callable[[int], None] = os._exit):
+                 exit_fn: Callable[[int], None] = os._exit, raw_dir: Optional[Path] = None,
+                 mode: str = "full", every: int = EXPRESS_EVERY_S):
         self.proj, self.f = proj, fetcher
         self.pinger = pinger or Pinger("")
         self.exit_fn = exit_fn
+        self.mode, self.every = mode, every
         self.consecutive_failures = 0
         self.sb_rate_limited = False
         self.last_tick = time.time()
-        self.raw = proj / "data_raw"
+        self.raw = raw_dir or proj / "data_raw"
         self.raw.mkdir(parents=True, exist_ok=True)
         self.state_path = self.raw / "collector_state.json"
         self.status_path = self.raw / "collector_status.json"
@@ -338,7 +355,10 @@ class Collector:
         self.pool = ThreadPoolExecutor(max_workers=WORKERS)
         self.stop = threading.Event()
         t = time.time()
-        self.next_due = {"speedbands": t, "daily": t, **{k: t for k in FEEDS}}
+        if mode == "expressway":  # the full-mode collector already polls the other feeds
+            self.next_due = {"speedbands": t}
+        else:
+            self.next_due = {"speedbands": t, "daily": t, **{k: t for k in FEEDS}}
         self.status: dict[str, Any] = {"pid": os.getpid(), "started": iso(now_sgt()), "today": {},
                                        "last_error": None}
 
@@ -366,7 +386,31 @@ class Collector:
             log.error("cannot write status file: %s", e)
 
     # -- speed bands
+    def write_compact(self, t0: datetime, pages: list[dict]) -> int:
+        """retrieved_at,last_updated,LinkID,SpeedBand rows for these pages; returns the row count."""
+        retrieved_at = iso(t0)
+        rows = ["retrieved_at,last_updated,LinkID,SpeedBand"]
+        for p in pages:
+            plu = p["last_updated"] or ""
+            rows.extend(f"{retrieved_at},{plu},{r.get('LinkID')},{r.get('SpeedBand')}" for r in p["value"])
+        write_gz_lines(rows, self.raw / "speedbands" / t0.strftime("%Y-%m-%d") /
+                       f"sb_{t0.strftime('%Y%m%d_%H%M%S')}.csv.gz")
+        return len(rows) - 1
+
+    def write_raw_hourly(self, t0: datetime, pages: list[dict]) -> bool:
+        """Full raw responses, at most one file per RAW_EVERY_MIN slot; True if written."""
+        slot = ((t0.hour * 60 + t0.minute) // RAW_EVERY_MIN) * RAW_EVERY_MIN
+        raw_path = (self.raw / "speedbands_raw" / t0.strftime("%Y-%m-%d") /
+                    f"sbraw_{t0.strftime('%Y%m%d')}_{slot // 60:02d}{slot % 60:02d}.jsonl.gz")
+        if raw_path.exists():
+            return False
+        write_gz_lines([raw_line("TrafficSpeedBands", iso(t0), i + 1, p["body"])
+                        for i, p in enumerate(pages)], raw_path)
+        return True
+
     def job_speedbands(self) -> None:
+        if self.mode == "expressway":
+            return self.job_expressway()
         t0 = now_sgt()
         self.sb_rate_limited = False
         probe = self.f.page(SPEED_PATH, 0)
@@ -385,22 +429,9 @@ class Collector:
             self._sb_log(t0, lu, "fetch_failed", len(result["pages"]), 0, False, False, result["message"])
             return
         lus, n, problem = check_snapshot(result["pages"])
-        retrieved_at = iso(t0)
         lu_str = lus[0] if len(lus) == 1 else (lu or "")
-        day, stamp = t0.strftime("%Y-%m-%d"), t0.strftime("%Y%m%d_%H%M%S")
-        rows = ["retrieved_at,last_updated,LinkID,SpeedBand"]
-        for p in result["pages"]:
-            plu = p["last_updated"] or ""
-            rows.extend(f"{retrieved_at},{plu},{r.get('LinkID')},{r.get('SpeedBand')}" for r in p["value"])
-        write_gz_lines(rows, self.raw / "speedbands" / day / f"sb_{stamp}.csv.gz")
-        slot = ((t0.hour * 60 + t0.minute) // RAW_EVERY_MIN) * RAW_EVERY_MIN
-        raw_path = (self.raw / "speedbands_raw" / day /
-                    f"sbraw_{t0.strftime('%Y%m%d')}_{slot // 60:02d}{slot % 60:02d}.jsonl.gz")
-        saved_raw = False
-        if not raw_path.exists():
-            write_gz_lines([raw_line("TrafficSpeedBands", retrieved_at, i + 1, p["body"])
-                            for i, p in enumerate(result["pages"])], raw_path)
-            saved_raw = True
+        self.write_compact(t0, result["pages"])
+        saved_raw = self.write_raw_hourly(t0, result["pages"])
         # remember the probe page's time, which is what the next probe is compared with
         self.state["sb_last_updated"] = lu or lu_str
         self._save_state()
@@ -409,6 +440,69 @@ class Collector:
         self._count("speedband_snapshots")
         log.info("speed bands %s: %d records, %d pages, %.1f s %s", lu_str, n, len(result["pages"]),
                  (now_sgt() - t0).total_seconds(), problem)
+
+    # -- expressway mode
+    def need_map(self) -> bool:
+        built = self.state.get("xw_map_time")
+        return not self.state.get("xw_pages") or not built or time.time() - built > MAP_MAX_AGE_S
+
+    def rebuild_map(self, t0: datetime) -> None:
+        """Full fetch: save it, and record which pages hold expressway links."""
+        result = fetch_speedbands(self.f, self.pool)
+        if not result["ok"]:
+            self.sb_rate_limited = "Rate limit quota violation" in result["message"]
+            self._sb_log(t0, None, "fetch_failed", len(result["pages"]), 0, False, False,
+                         "page map: " + result["message"])
+            return
+        pages = result["pages"]
+        links = {p["skip"]: [str(r.get("LinkID")) for r in p["value"]
+                             if str(r.get("RoadCategory")) == EXPRESS_CATEGORY] for p in pages}
+        self.state["xw_pages"] = sorted(s for s, ids in links.items() if ids)
+        self.state["xw_links"] = sorted(i for ids in links.values() for i in ids)
+        self.state["xw_map_time"] = time.time()
+        self.state["xw_page_lu"] = {str(p["skip"]): p["last_updated"] for p in pages if links[p["skip"]]}
+        self._save_state()
+        n = self.write_compact(t0, pages)
+        saved_raw = self.write_raw_hourly(t0, pages)
+        lus, _, problem = check_snapshot(pages)
+        msg = (f"page map rebuilt: {len(self.state['xw_links'])} expressway links on "
+               f"{len(self.state['xw_pages'])} of {len(pages)} pages")
+        self._sb_log(t0, lus[-1] if lus else None, "ok" if not problem else "ok_flagged",
+                     len(pages), n, True, saved_raw, msg)
+        log.info(msg)
+
+    def job_expressway(self) -> None:
+        t0 = now_sgt()
+        self.sb_rate_limited = False
+        if self.need_map():
+            return self.rebuild_map(t0)
+        results = list(self.pool.map(lambda s: self.f.page(SPEED_PATH, s), self.state["xw_pages"]))
+        bad = [r for r in results if not r["ok"]]
+        if bad:
+            self.sb_rate_limited = any(is_rate_limited(r) for r in bad)
+            self._sb_log(t0, None, "fetch_failed", len(results) - len(bad), 0, False, False,
+                         f"{len(bad)} page(s) failed, e.g. " + describe(bad[0]))
+            return
+        # save only pages whose time changed since this page was last read; a page that steps back
+        # to an older update is saved again, which processing removes as a duplicate (LinkID, time)
+        seen = self.state.setdefault("xw_page_lu", {})
+        changed = [p for p in results if seen.get(str(p["skip"])) != p["last_updated"]]
+        seen.update({str(p["skip"]): p["last_updated"] for p in results})
+        n = self.write_compact(t0, changed) if changed else 0
+        found = {str(r.get("LinkID")) for p in results for r in p["value"]
+                 if str(r.get("RoadCategory")) == EXPRESS_CATEGORY}
+        missing = set(self.state["xw_links"]) - found
+        msg = f"{len(changed)} of {len(results)} pages changed"
+        if missing:  # LTA added or removed links, so the pages shifted: full fetch next time
+            self.state["xw_map_time"] = None
+            msg += f"; {len(missing)} expressway links not on the mapped pages, page map will be rebuilt"
+            log.warning(msg)
+        self._save_state()
+        lus = sorted({p["last_updated"] for p in results if p["last_updated"]})
+        self._sb_log(t0, lus[-1] if lus else None, "ok_flagged" if missing else "ok",
+                     len(results), n, bool(changed), False, msg)
+        if changed:
+            self._count("expressway_pages_saved")
 
     def _sb_log(self, t0, lu, status, pages, records, saved, saved_raw, message) -> None:
         if status not in ("ok", "ok_flagged"):
@@ -501,7 +595,7 @@ class Collector:
                 wait = seconds_to_next_hour()
                 log.warning("LTA rate limit reached: next speed-band probe in %d s (after the hour)", wait)
                 return wait
-            return PROBE_EVERY_S
+            return self.every if self.mode == "expressway" else PROBE_EVERY_S
         if name == "daily":
             return DAILY_CHECK_EVERY_S
         return FEEDS[name][1]
@@ -563,8 +657,8 @@ def acquire_lock(path: Path):
     return fh
 
 
-def setup_logging(proj: Path, verbose: bool) -> None:
-    log_dir = proj / "data_raw" / "logs"
+def setup_logging(raw: Path, verbose: bool) -> None:
+    log_dir = raw / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     handler = logging.handlers.TimedRotatingFileHandler(log_dir / "collector.log", when="midnight",
                                                         backupCount=0, encoding="utf-8")
@@ -581,22 +675,32 @@ def setup_logging(proj: Path, verbose: bool) -> None:
 def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description="24/7 LTA DataMall collector (SLDS project 1.3)")
     ap.add_argument("--once", action="store_true", help="collect every feed once, then exit")
+    ap.add_argument("--mode", choices=["full", "expressway"], default="full",
+                    help="full: every feed (default); expressway: expressway speed-band pages only")
+    ap.add_argument("--key-name", default="LTA_ACCOUNT_KEY", help="name of the key in .Renviron")
+    ap.add_argument("--hc-name", default="HC_PING_URL", help="name of the Healthchecks URL in .Renviron")
+    ap.add_argument("--data-dir", default=None,
+                    help="output folder in the project (default data_raw, or data_raw_expressway)")
+    ap.add_argument("--every", type=int, default=EXPRESS_EVERY_S,
+                    help="expressway mode: seconds between fetches (default %(default)s)")
     args = ap.parse_args(argv)
 
     proj = project_dir()
-    setup_logging(proj, verbose=True)
-    lock = acquire_lock(proj / "data_raw" / "collector.lock")
+    raw = proj / (args.data_dir or ("data_raw_expressway" if args.mode == "expressway" else "data_raw"))
+    setup_logging(raw, verbose=True)
+    lock = acquire_lock(raw / "collector.lock")
     if lock is None:
         print("Collector already running; nothing to do.")
         return 0
-    key = read_key(proj)
+    key = read_setting(proj, args.key_name)
     if not key:
-        log.error("LTA_ACCOUNT_KEY not found in %s", proj / ".Renviron")
+        log.error("%s not found in %s", args.key_name, proj / ".Renviron")
         return 1
-    hc_url = read_setting(proj, "HC_PING_URL")
+    hc_url = read_setting(proj, args.hc_name)
     if not hc_url:
-        log.info("no HC_PING_URL in .Renviron: alerts are off")
-    c = Collector(proj, Fetcher(key), Pinger(hc_url))
+        log.info("no %s in .Renviron: alerts are off", args.hc_name)
+    log.info("mode %s, key %s, output %s", args.mode, args.key_name, raw)
+    c = Collector(proj, Fetcher(key), Pinger(hc_url), raw_dir=raw, mode=args.mode, every=args.every)
 
     def stop_handler(signum, frame):
         log.info("stop signal received")

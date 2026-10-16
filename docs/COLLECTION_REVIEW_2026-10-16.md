@@ -6,6 +6,21 @@ For: whoever runs a collector (desktop and Ubuntu mini PC). Decision needed befo
 
 Data checked: 225 desktop snapshots, 32.4 M rows, 143,787 links, 14 Oct 22:00 to 16 Oct 12:05.
 
+**Decision (16 Oct, ~13:20 SGT): option C, both collectors on the Ubuntu mini PC.** Accepted trade-off: no backup machine. The desktop stays off and is a cold spare.
+
+| Service | Key | What it collects | Output |
+|---|---|---|---|
+| `lta-collector` | `LTA_ACCOUNT_KEY` | Whole network at every update (`60c74a2` logic), plus incidents, VMS, travel times, road works | `data_raw/` |
+| `lta-collector-expressway` | `LTA_ACCOUNT_KEY2` (different LTA account) | `--mode expressway`: the 58 expressway pages every 2 min; saves only pages whose time changed; full fetch to rebuild the page map at start, every 6 h, and whenever an expressway LinkID is missing from the mapped pages | `data_raw_expressway/` |
+
+- **Interval.** 2 minutes rather than 1 keeps the second key at about 1,800 calls an hour, well under the ~4,000 limit, because each page shows each update for about 5 minutes. Tighten it with `--every 60` only if coverage turns out short.
+- **Processing.** `04_process.ipynb` now reads every `data_raw*/speedbands` folder and de-duplicates on `(LinkID, t)`. Copy the desktop's data in as `data_raw_desktop/` to merge it the same way.
+- **Answers to section 5 from the mini PC:**
+  1. Collecting since 12:07 on 16 Oct, but rate-limited from 12:17 to 13:00, so it does not cover the desktop gap.
+  2. Option C was chosen.
+  3. Yes, the same pattern: about 4,000 calls in 10 minutes on the old code, blocked at 12:17, reset at 13:00.
+  4. The live-hour check of `60c74a2` starts at 13:06.
+
 ---
 
 ## 1. Rate limit: what happened and what is already fixed
