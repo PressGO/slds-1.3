@@ -17,6 +17,7 @@ Format: `date  topic: decision (reason; author)`
 2026-10-16  Collection fix: each LTA speed-band update is fetched once; no refetch of mixed-time snapshots; no retry on rate-limit faults, pause to the next hour (LTA cuts a key off after ~4,000 calls in a clock hour; commits deda600, 60c74a2)   (team)
 2026-10-16  Time t, confirmed: each row's own last_updated, not the snapshot time (LTA serves pages from out-of-sync servers; per-row label reliable: 9.7 M repeats, 0 conflicts; see Background below)   (team)
 2026-10-16  Collection (supersedes 2026-10-14): option C on one machine. Linux mini PC runs lta-collector (whole network at each update, key 1, data_raw/) and lta-collector-expressway (58 expressway pages every 2 min, key 2 from a different LTA account, data_raw_expressway/). Desktop is a cold spare; its 14-16 Oct data to be merged as data_raw_desktop/. Accepted risk: no backup machine while the desktop is off (one-update fetching misses ~20% of expressway links per update; the expressway collector closes that gap; commit 0a35c4c)   (team)
+2026-10-16  Flood Alerts (PUB, API guide 2.30) collected by lta-collector-expressway (key 2) every 3 min, saved on change, into data_raw_expressway/feeds/flood_alerts/. Use: label audit and masking (e.g. flag or exclude rows near an active flash flood) and explaining failure cases; NOT a model feature (too few events). Past alerts can't be downloaded later. About 20 calls/hour on key 2 (key 1 is near the ~4,000/hour limit)   (team)
 ```
 
 ## Background: speed-band collection findings (16 Oct 2026)

@@ -139,7 +139,7 @@ journalctl -u lta-collector -n 30 --no-pager
 
 ## Step 4b: Second service, expressway collector (added 16 Oct 2026)
 
-Option C (`DECISIONS.md`, 16 Oct), run on this PC: a second copy of the same script fetches only the 58 pages that hold the expressway links, every 2 minutes, with its own key, into `data_raw_expressway/`. It has its own lock, so it runs alongside `lta-collector`.
+Option C (`DECISIONS.md`, 16 Oct), run on this PC: a second copy of the same script fetches only the 58 pages that hold the expressway links, every 2 minutes, with its own key, into `data_raw_expressway/`. It also polls PUB Flood Alerts every 3 minutes (saved when changed). It has its own lock, so it runs alongside `lta-collector`.
 
 `.Renviron` needs `LTA_ACCOUNT_KEY2=` (a key from a different LTA account) and, for alerts, `HC_PING_URL2=` (a separate Healthchecks check, e.g. "SLDS expressway collector", period 5 min, grace 15 min).
 

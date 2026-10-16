@@ -8,8 +8,8 @@ Runs continuously until stopped. Standard library only (Python 3.9+).
 
 Modes
   full (default)  everything below, saved in data_raw/.
-  expressway      speed bands only, for the expressway links (RoadCategory 1), saved in
-                  data_raw_expressway/ with its own lock, log, state and status. A full fetch maps
+  expressway      speed bands for the expressway links (RoadCategory 1), plus PUB Flood Alerts,
+                  saved in data_raw_expressway/ with its own lock, log, state and status. A full fetch maps
                   which pages hold expressway links (58 of 288 on 16 Oct); after that only those
                   pages are fetched, every --every seconds (default 120), and only pages whose
                   lastUpdatedTime changed are saved. Because LTA's pages lag each other by minutes,
@@ -26,6 +26,9 @@ What it collects (LTA DataMall API User Guide v6.10)
   Est. Travel Times (2.13)     every 5 min, saved when the content changes
   Approved Road Works (2.16)   once a day
   Planned Road Openings (2.15) once a day
+  Flood Alerts (2.30, PUB)     expressway mode only: every 3 min, saved when the content changes.
+                               For checking labels and explaining failures, not a model feature;
+                               past alerts can't be downloaded later.
 
 Reliability
   - Every request: timeout, up to 4 attempts with back-off on connection errors, 429 and 5xx,
@@ -101,6 +104,10 @@ FEEDS = {  # name: (path, poll interval in seconds)
     "vms": ("VMS", 120),
     "travel_times": ("EstTravelTimes", 300),
 }
+EXPRESS_FEEDS = {  # extra feeds polled by the expressway-mode collector (second key)
+    "flood_alerts": ("PubFloodAlerts", 180),
+}
+ALL_FEEDS = {**FEEDS, **EXPRESS_FEEDS}
 DAILY_FEEDS = {"roadworks": "RoadWorks", "road_openings": "RoadOpenings"}
 DAILY_AFTER_HOUR = 0          # daily feeds fetched on the first check after 00:10
 DAILY_AFTER_MINUTE = 10
@@ -354,7 +361,7 @@ class Collector:
         self.stop = threading.Event()
         t = time.time()
         if mode == "expressway":  # the full-mode collector already polls the other feeds
-            self.next_due = {"speedbands": t}
+            self.next_due = {"speedbands": t, **{k: t for k in EXPRESS_FEEDS}}
         else:
             self.next_due = {"speedbands": t, "daily": t, **{k: t for k in FEEDS}}
         self.status: dict[str, Any] = {"pid": os.getpid(), "started": iso(now_sgt()), "today": {},
@@ -533,7 +540,7 @@ class Collector:
             skip += PAGE_SIZE
 
     def job_feed(self, name: str) -> None:
-        path = FEEDS[name][0]
+        path = ALL_FEEDS[name][0]
         t0 = now_sgt()
         res = self.fetch_feed(path)
         row = {"retrieved_at": iso(t0), "feed": name, "status": "ok" if res["ok"] else "failed",
@@ -596,7 +603,7 @@ class Collector:
             return self.every if self.mode == "expressway" else PROBE_EVERY_S
         if name == "daily":
             return DAILY_CHECK_EVERY_S
-        return FEEDS[name][1]
+        return ALL_FEEDS[name][1]
 
     def run_once(self) -> None:
         for name in self.next_due:
