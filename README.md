@@ -1,7 +1,7 @@
 # Recurring or unusual? Early warning of abnormal slowdowns on Singapore expressways
 
 42.510 Statistical Learning for Data Science (SUTD, 2026), catalog topic 1.3.
-Team: [Name 1], [Name 2], [Name 3], [Name 4].
+Team: Aveline, Liam, Juan Peng, Ronnie
 
 Status, 16 Oct 2026: LTA traffic data collected 24/7 since 14 Oct 2026 (desktop until 16 Oct; since then two collectors with two keys on the Linux mini PC, see `DECISIONS.md`). Proposal due 17 Oct; no modelling until the proposal is approved (Brief §6.1).
 
