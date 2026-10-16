@@ -20,10 +20,13 @@ Reliability
     except LTA's rate-limit fault (HTTP 500 "Rate limit quota violation"), which is not retried.
   - Rate limit: LTA's quota on a key resets at the top of each hour. After a rate-limit fault
     the speed bands are not probed again until just after the next full hour.
-  - A speed-band snapshot is saved only if every page arrived. Pages often carry two
-    lastUpdatedTime values because LTA updates its pages one by one; such snapshots are saved
-    and logged as ok_flagged (per-page times are kept), and are not refetched, since refetching
-    every one of them used up the hourly quota within minutes.
+  - A speed-band snapshot is saved only if every page arrived. Pages nearly always carry two
+    or three lastUpdatedTime values, scattered across the pages, because LTA serves them from
+    several servers that are not in sync (a page can even step back to the previous update).
+    Refetching does not give a clean snapshot, so such snapshots are saved and logged as
+    ok_flagged with each row's own last_updated, and are not refetched (refetching used up the
+    hourly quota within minutes). A fetch starts only when page 1's time is newer than the
+    last fetched one, so a page stepping back does not trigger a new fetch.
   - Files are written to a temporary name and renamed, so a crash never leaves half a file.
   - One failing feed never stops the others; errors are logged and retried on the next cycle.
   - Only one copy can run (operating-system file lock, released automatically if it dies).
@@ -249,6 +252,20 @@ def is_rate_limited(res: dict) -> bool:
     return "Rate limit quota violation" in (res.get("body") or "")
 
 
+def is_newer(lu: Optional[str], seen: Optional[str]) -> bool:
+    """True if the probe's lastUpdatedTime is newer than the last one fetched.
+    LTA serves pages from several servers that are not in sync, so page 1 can step back to the
+    previous update (seen 16 Oct: a page went 12:00 -> 11:55); a step back is not a new update.
+    A step back of more than an hour is accepted, in case LTA's clock or the state file is off."""
+    if not lu or not seen:
+        return True
+    try:
+        new, old = (datetime.strptime(s, "%Y-%m-%d %H:%M:%S") for s in (lu, seen))
+    except ValueError:
+        return lu != seen
+    return new > old or new < old - timedelta(hours=1)
+
+
 def seconds_to_next_hour(margin_s: int = 30) -> int:
     t = now_sgt()
     return (59 - t.minute) * 60 + (60 - t.second) + margin_s
@@ -360,7 +377,7 @@ class Collector:
                 log.error("LTA rejected the key (HTTP %s): check LTA_ACCOUNT_KEY in .Renviron", probe["status"])
             return
         lu = probe["last_updated"]
-        if lu and lu == self.state.get("sb_last_updated"):
+        if not is_newer(lu, self.state.get("sb_last_updated")):
             return  # nothing new; no log row for unchanged probes
         result = fetch_speedbands(self.f, self.pool, first=probe)
         if not result["ok"]:
