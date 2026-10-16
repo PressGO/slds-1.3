@@ -16,9 +16,14 @@ What it collects (LTA DataMall API User Guide v6.10)
   Planned Road Openings (2.15) once a day
 
 Reliability
-  - Every request: timeout, up to 4 attempts with back-off on connection errors, 429 and 5xx.
-  - A speed-band snapshot is saved only if every page arrived, LinkIDs are unique and all
-    pages carry the same lastUpdatedTime; if LTA updated mid-fetch it refetches once.
+  - Every request: timeout, up to 4 attempts with back-off on connection errors, 429 and 5xx,
+    except LTA's rate-limit fault (HTTP 500 "Rate limit quota violation"), which is not retried.
+  - Rate limit: LTA's quota on a key resets at the top of each hour. After a rate-limit fault
+    the speed bands are not probed again until just after the next full hour.
+  - A speed-band snapshot is saved only if every page arrived. Pages often carry two
+    lastUpdatedTime values because LTA updates its pages one by one; such snapshots are saved
+    and logged as ok_flagged (per-page times are kept), and are not refetched, since refetching
+    every one of them used up the hourly quota within minutes.
   - Files are written to a temporary name and renamed, so a crash never leaves half a file.
   - One failing feed never stops the others; errors are logged and retried on the next cycle.
   - Only one copy can run (operating-system file lock, released automatically if it dies).
@@ -216,7 +221,8 @@ class Fetcher:
             if res["status"] == 200:
                 return res
             last = res
-            retryable = res["status"] is None or res["status"] == 429 or res["status"] >= 500
+            retryable = (res["status"] is None or res["status"] == 429 or res["status"] >= 500) \
+                and not is_rate_limited(res)
             if not retryable or attempt == len(BACKOFF_S):
                 break
             self.sleep(BACKOFF_S[attempt])
@@ -236,6 +242,16 @@ class Fetcher:
             return out
         out.update(ok=True, value=js.get("value") or [], last_updated=js.get("lastUpdatedTime"))
         return out
+
+
+def is_rate_limited(res: dict) -> bool:
+    """LTA reports an exhausted quota as HTTP 500 with a 'Rate limit quota violation' fault."""
+    return "Rate limit quota violation" in (res.get("body") or "")
+
+
+def seconds_to_next_hour(margin_s: int = 30) -> int:
+    t = now_sgt()
+    return (59 - t.minute) * 60 + (60 - t.second) + margin_s
 
 
 def describe(p: dict) -> str:
@@ -295,6 +311,7 @@ class Collector:
         self.pinger = pinger or Pinger("")
         self.exit_fn = exit_fn
         self.consecutive_failures = 0
+        self.sb_rate_limited = False
         self.last_tick = time.time()
         self.raw = proj / "data_raw"
         self.raw.mkdir(parents=True, exist_ok=True)
@@ -334,8 +351,10 @@ class Collector:
     # -- speed bands
     def job_speedbands(self) -> None:
         t0 = now_sgt()
+        self.sb_rate_limited = False
         probe = self.f.page(SPEED_PATH, 0)
         if not probe["ok"]:
+            self.sb_rate_limited = is_rate_limited(probe)
             self._sb_log(t0, None, "probe_failed", 0, 0, False, False, describe(probe))
             if probe.get("status") in (401, 403):
                 log.error("LTA rejected the key (HTTP %s): check LTA_ACCOUNT_KEY in .Renviron", probe["status"])
@@ -343,18 +362,12 @@ class Collector:
         lu = probe["last_updated"]
         if lu and lu == self.state.get("sb_last_updated"):
             return  # nothing new; no log row for unchanged probes
-        result, problem, lus, n = None, "", [], 0
-        for attempt in (1, 2):  # refetch once if LTA updated during the fetch
-            result = fetch_speedbands(self.f, self.pool, first=probe if attempt == 1 else None)
-            if not result["ok"]:
-                break
-            lus, n, problem = check_snapshot(result["pages"])
-            if not problem:
-                break
-        assert result is not None
+        result = fetch_speedbands(self.f, self.pool, first=probe)
         if not result["ok"]:
+            self.sb_rate_limited = "Rate limit quota violation" in result["message"]
             self._sb_log(t0, lu, "fetch_failed", len(result["pages"]), 0, False, False, result["message"])
             return
+        lus, n, problem = check_snapshot(result["pages"])
         retrieved_at = iso(t0)
         lu_str = lus[0] if len(lus) == 1 else (lu or "")
         day, stamp = t0.strftime("%Y-%m-%d"), t0.strftime("%Y%m%d_%H%M%S")
@@ -371,9 +384,9 @@ class Collector:
             write_gz_lines([raw_line("TrafficSpeedBands", retrieved_at, i + 1, p["body"])
                             for i, p in enumerate(result["pages"])], raw_path)
             saved_raw = True
-        if not problem:
-            self.state["sb_last_updated"] = lu_str
-            self._save_state()
+        # remember the probe page's time, which is what the next probe is compared with
+        self.state["sb_last_updated"] = lu or lu_str
+        self._save_state()
         status = "ok" if not problem else "ok_flagged"
         self._sb_log(t0, lu_str, status, len(result["pages"]), n, True, saved_raw, problem)
         self._count("speedband_snapshots")
@@ -467,6 +480,10 @@ class Collector:
 
     def interval(self, name: str) -> int:
         if name == "speedbands":
+            if self.sb_rate_limited:
+                wait = seconds_to_next_hour()
+                log.warning("LTA rate limit reached: next speed-band probe in %d s (after the hour)", wait)
+                return wait
             return PROBE_EVERY_S
         if name == "daily":
             return DAILY_CHECK_EVERY_S
