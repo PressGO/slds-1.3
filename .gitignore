@@ -35,6 +35,8 @@ Thumbs.db
 desktop.ini
 .DS_Store
 
-# Kept locally, not shared: personal to-do list; 16 Oct collection review (summarised in DECISIONS.md)
+# Kept locally, not shared: personal to-do list; 16 Oct collection review (summarised in DECISIONS.md);
+# proposal workbook (draft; the repo is public). The report/ folder itself stays in Git for the final report.
 TODO.md
 docs/COLLECTION_REVIEW_2026-10-16.md
+report/proposal_workbook.md
