@@ -20,6 +20,12 @@ print("Last error:", s.get("last_error"))
 PY
   echo "Last hour of speed-band fetches (status counts):"
   awk -F, -v since="\"$(date -d '1 hour ago' +%Y-%m-%dT%H:%M)" 'NR>1 && $1 >= since {print $3}' "$dir/log_speedbands.csv" 2>/dev/null | sort | uniq -c
+  if [ -f "$dir/log_feeds.csv" ]; then
+    echo "Other feeds (last poll, status, records):"
+    awk -F, 'NR>1 {gsub(/"/, ""); last[$2] = $1; st[$2] = $3; rec[$2] = $4}
+             END {for (f in last) printf "  %-14s %s %s  %-6s records=%s\n", f, substr(last[f], 1, 10), substr(last[f], 12, 5), st[f], rec[f]}' \
+        "$dir/log_feeds.csv" | sort
+  fi
   echo
 done
 du -sh data_raw data_raw_expressway 2>/dev/null
