@@ -45,7 +45,7 @@ The proposal is worth 5 of the 30 points, and "full score is given if all the ch
 
 ### Still to do this week
 
-- [x] (14 Oct; moved to the Linux mini PC on 16 Oct, see §6.3 and §7) **Start the 24/7 collector on the desktop:** `01_collector_monitor.ipynb`, cells 1–4 (cell 3 deletes the old 5-minute task if one was created). Keep the desktop awake (never sleep when plugged in).
+- [x] (14 Oct; moved to the Linux mini PC on 16 Oct, see §6.3 and §7) **Start the 24/7 collector on the desktop:** `01_windows_collector_monitor.ipynb`, cells 1–4 (cell 3 deletes the old 5-minute task if one was created). Keep the desktop awake (never sleep when plugged in).
 - [ ] Check it the next morning: monitor notebook cell 5 (heartbeat under 2 min, about 12 snapshots per hour, no gap over 10 min).
 - [ ] Fill in team names in §9 and the proposal draft (§5.2). Everyone reads this file.
 - [ ] Send the instructor email in §11 (collection before approval, Python for collection, package due date, AI tools).
@@ -555,7 +555,7 @@ slds-1.3-congestion/
 ├── CONTRIBUTIONS.md           who did what, updated weekly
 ├── AI_USE.md                  tool, date, purpose, prompts, how checked
 ├── .Renviron                  API keys: never committed
-├── 01_collector_monitor.ipynb set up, start and health-check the collector
+├── 01_windows_collector_monitor.ipynb set up, start and health-check the collector
 ├── 03_visuals.ipynb           maps, time–space diagrams, band shares
 ├── 04_process.ipynb           raw → link registry, panel, incidents, analysis panel
 ├── analysis/

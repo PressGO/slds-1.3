@@ -9,11 +9,11 @@ Status, 16 Oct 2026: LTA traffic data collected 24/7 since 14 Oct 2026 (desktop 
 
 | Path | What it does | How to run |
 |---|---|---|
-| `analysis/lta_collector.py` | Collects LTA DataMall feeds 24/7: Traffic Speed Bands once per LTA update (about every 5 min), incidents and VMS (every 2 min), estimated travel times (every 5 min), road works and road openings (daily), into `data_raw/`. Python standard library only. Pauses to the next hour if LTA's rate limit (~4,000 calls/key/hour) is hit. | systemd service `lta-collector` on the Linux PC (`docs/LINUX_SETUP_FOR_CLAUDE_CODE.md`); on Windows via `01_collector_monitor.ipynb` |
+| `analysis/lta_collector.py` | Collects LTA DataMall feeds 24/7: Traffic Speed Bands once per LTA update (about every 5 min), incidents and VMS (every 2 min), estimated travel times (every 5 min), road works and road openings (daily), into `data_raw/`. Python standard library only. Pauses to the next hour if LTA's rate limit (~4,000 calls/key/hour) is hit. | systemd service `lta-collector` on the Linux PC (`docs/LINUX_SETUP_FOR_CLAUDE_CODE.md`); on Windows via `01_windows_collector_monitor.ipynb` |
 | `analysis/lta_collector.py --mode expressway` | Second collector (option C, decided 16 Oct 2026): only the 58 speed-band pages that hold the 2,598 expressway links, every 2 min, with a second key (`LTA_ACCOUNT_KEY2`), into `data_raw_expressway/`. Catches updates that one fetch per update misses, because LTA's pages lag each other. | systemd service `lta-collector-expressway` on the Linux PC; see `docs/LINUX_SETUP_FOR_CLAUDE_CODE.md` Step 4b |
 | `check.sh` | Health check of both Linux collectors (service, heartbeat, last hour's fetches, disk) | `~/slds-1.3/check.sh` |
-| `02_collector_health.ipynb` | The same checks as a notebook, read-only: services, heartbeats, fetches per hour by status, rate-limit errors, expressway coverage per 5-min update (data_raw alone vs both collectors, with a chart), disk | Top to bottom; set `HOURS` to look further back |
-| `01_collector_monitor.ipynb` | Windows only (desktop, now a cold spare): creates the scheduled task that keeps the collector running; health check; stop. | Cells 1–4 once per machine; cell 5 daily |
+| `02_linux_collector_health.ipynb` | The same checks as a notebook, read-only: services, heartbeats, fetches per hour by status, rate-limit errors, expressway coverage per 5-min update (data_raw alone vs both collectors, with a chart), disk | Top to bottom; set `HOURS` to look further back |
+| `01_windows_collector_monitor.ipynb` | Windows only (desktop, now a cold spare): creates the scheduled task that keeps the collector running; health check; stop. | Cells 1–4 once per machine; cell 5 daily |
 | `analysis/get_context_data.py` | NEA 5-minute rainfall (downloaded by date), MOM public holidays, MOE school terms and F1 closure dates, written to `data_processed/` | `.venv\Scripts\python analysis\get_context_data.py` |
 | `04_process.ipynb` | Raw files → link registry, expressway speed-band panel, quality report, incidents, analysis panel (Parquet). Reads every `data_raw*/` folder (both collectors, plus the desktop's data if copied in as `data_raw_desktop/`) and removes duplicates on (link, LTA update time). | Top to bottom |
 | `03_visuals.ipynb` | Maps, time–space diagrams, share of links by speed band | Cell 1, then any plot cell |
@@ -41,7 +41,7 @@ Planned: processing into ~1 km expressway segments, and the modelling scripts in
    ```
 
    `HC_PING_URL` (e-mail alert when collection stops) and `DATAGOVSG_API_KEY` (higher rate limit) are optional. The `...2` lines are only needed on the PC that runs the expressway collector. LTA's rate limit (about 4,000 calls an hour, resetting on the hour; not published) is per key, so each collector needs its own key.
-3. To collect on Windows: run `01_collector_monitor.ipynb` cells 1–4, and keep the machine awake and signed in. On Linux: a systemd service; see `docs/LINUX_SETUP_FOR_CLAUDE_CODE.md`. Collection needs no Python packages.
+3. To collect on Windows: run `01_windows_collector_monitor.ipynb` cells 1–4, and keep the machine awake and signed in. On Linux: a systemd service; see `docs/LINUX_SETUP_FOR_CLAUDE_CODE.md`. Collection needs no Python packages.
 4. To process: run `get_context_data.py`, then `04_process.ipynb`.
 
 ## Data
