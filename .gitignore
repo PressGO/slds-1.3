@@ -34,3 +34,6 @@ _superseded/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Personal to-do list: kept locally, not shared
+TODO.md

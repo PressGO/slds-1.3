@@ -34,7 +34,7 @@ Get the code from GitHub (https://github.com/PressGO/slds-1.3; done 16 Oct 2026)
 
 ```
 slds-1.3/
-├── README.md  AI_USE.md  TODO.md  PROJECT_PLAN.md  DECISIONS.md  .gitignore  check.sh
+├── README.md  AI_USE.md  PROJECT_PLAN.md  DECISIONS.md  .gitignore  check.sh
 ├── requirements.txt  setup_env.bat  setup_env.sh   (notebook environment: Windows / Linux)
 ├── 00_check_sources.ipynb  00_check_sources_python.ipynb  01_collector_monitor.ipynb  03_visuals.ipynb  04_process.ipynb
 ├── analysis/   lta_collector.py  get_context_data.py  00_check_sources.R  00_check_sources.py

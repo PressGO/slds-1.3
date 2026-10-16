@@ -550,7 +550,6 @@ This follows Brief §6.2 p.4, plus planning files of our own.
 slds-1.3-congestion/
 ├── README.md                  how to reproduce; licence notice
 ├── PROJECT_PLAN.md            this file
-├── TODO.md                    current to-do list
 ├── DECISIONS.md               dated, frozen definitions and any changes
 ├── check.sh                   health check of both Linux collectors
 ├── CONTRIBUTIONS.md           who did what, updated weekly

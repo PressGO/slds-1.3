@@ -19,4 +19,4 @@ Format: `date  topic: decision (reason; author)`
 2026-10-16  Collection (supersedes 2026-10-14): option C on one machine. Linux mini PC runs lta-collector (whole network at each update, key 1, data_raw/) and lta-collector-expressway (58 expressway pages every 2 min, key 2 from a different LTA account, data_raw_expressway/). Desktop is a cold spare; its 14-16 Oct data to be merged as data_raw_desktop/. Accepted risk: no backup machine while the desktop is off (one-update fetching misses ~20% of expressway links per update; the expressway collector closes that gap; commit 0a35c4c)   (team)
 ```
 
-Pending (`TODO.md` §3): the 15 Oct methods changes (1 km segments, travel-time label, one weekday norm, test 10-20 Nov, leave one expressway out, drop road works). If accepted, add them here with the date and mark which entries above they supersede.
+Pending team decision: the 15 Oct methods changes (1 km segments, travel-time label, one weekday norm, test 10-20 Nov, leave one expressway out, drop road works). If accepted, add them here with the date and mark which entries above they supersede.
