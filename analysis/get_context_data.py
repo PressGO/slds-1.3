@@ -11,7 +11,7 @@ Run any time; it only downloads what is missing. Standard library only (Python 3
    - Tidy table:         data_processed/rainfall_5min.csv.gz   timestamp, station_id, rain_mm
    - Stations:           data_processed/rain_stations.csv      station_id, name, lat, lon, days_seen
    Rate limit without a key: 6 calls per 10 s, so the script waits 2 s between calls and backs off on HTTP 429.
-   Optional key (higher limit): DATAGOVSG_API_KEY=... in .Renviron.
+   Optional key (higher limit): DATA_GOV_KEY=... in .Renviron (old name DATAGOVSG_API_KEY also read).
 
 2. MOM public holidays 2026 (data.gov.sg dataset d_149b61ad0a22f61c09dc80f2df5bbec8)
    - Raw: data_raw/calendar/mom_public_holidays_2026.json
@@ -252,7 +252,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--skip-calendar", action="store_true")
     args = ap.parse_args(argv)
     proj = project_dir()
-    key = read_renviron(proj, "DATAGOVSG_API_KEY")
+    key = read_renviron(proj, "DATA_GOV_KEY") or read_renviron(proj, "DATAGOVSG_API_KEY")
     headers = {"accept": "application/json", **({"x-api-key": key} if key else {})}
     if not args.skip_calendar:
         update_calendar(proj, headers)

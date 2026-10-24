@@ -32,4 +32,11 @@ Summary of the 16 Oct collection review (desktop data 14 Oct 22:00 to 16 Oct 12:
 - **Expressway pages.** The 2,598 expressway links sit on 58 of the 288 pages (mostly pages 60–69), on the same pages on 14 and 16 Oct. Fetching only those pages is cheap enough to do every 2 minutes.
 - **Options considered.** A: one collector, one fetch per update (~80–95% of expressway links per update). B: one key, expressway pages every minute plus the whole network every 15 min. C (chosen): two keys, whole network per update plus expressway pages often.
 
+### 2026-10-24: Raw-data backup to Google Drive (lead)
+
+- The school OneDrive needs Zscaler on the Linux PC, and Zscaler could cut the collectors' connection, so the backup goes to a Google Drive folder (`SLDS_1.3_raw`) shared with the team as Viewer. This replaces the weekly copy planned in PROJECT_PLAN §6 (item 4, Backups).
+- `upload_raw.sh` runs nightly from cron at 02:30 SGT (cron because it needs no sudo; after midnight log rotation, quiet hours). One `.tar` per collector per finished day, because Drive is slow with ~2,000 small files a day and a teammate needs only one file per day. Checksums (SHA-256 in `SHA256SUMS.txt`; rclone compares MD5 with Drive).
+- Append only: `rclone copy --immutable` and `rclone check` only; no `sync`, `delete` or `move`. A packed day is never rebuilt; files that change later are reported as `WARN` in the log. Local tars are kept (about 6 GB by 20 Nov, 830 GB free).
+- The same job runs `get_context_data.py`, so NEA rainfall for each day is downloaded the night after (backfilled 17-23 Oct on 24 Oct; key `DATA_GOV_KEY`).
+
 Pending team decision: the 15 Oct methods changes (1 km segments, travel-time label, one weekday norm, test 10-20 Nov, leave one expressway out, drop road works). If accepted, add them here with the date and mark which entries above they supersede.
