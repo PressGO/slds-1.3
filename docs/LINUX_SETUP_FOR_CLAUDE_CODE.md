@@ -269,5 +269,5 @@ To update the code on this PC: `cd ~/slds-1.3 && git pull`, then restart both se
 ## Later (not part of this task)
 
 - The desktop is a cold spare: keep its existing folder (it holds data from 14 to 16 Oct and its `.Renviron`). To use it again, `git pull` there first, and never run it on a key that a running collector already uses.
-- Copy the desktop's `data_raw/` to this PC as `~/slds-1.3/data_raw_desktop/`. `04_process.ipynb` reads every `data_raw*/` folder and removes duplicates.
+- ~~Copy the desktop's `data_raw/` to this PC as `~/slds-1.3/data_raw_desktop/`.~~ Dropped 24 Oct: the desktop data is not used (`DECISIONS.md`).
 - Once a week, back up `~/slds-1.3/data_raw/` and `~/slds-1.3/data_raw_expressway/` to an external drive.

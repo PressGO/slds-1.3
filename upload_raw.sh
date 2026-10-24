@@ -2,10 +2,12 @@
 # Nightly backup of the raw data to Google Drive (cron, 02:30 SGT). Never deletes or overwrites on Drive.
 #   1. get_context_data.py  rainfall for any finished day still missing (yesterday, and earlier failures);
 #                           up to RAIN_TRIES (4) tries, RAIN_WAIT (1200 s) apart, if data.gov.sg fails
-#   2. archive_raw.py       pack each finished day into archive_raw/<unit>/<unit>_<date>.tar
-#   3. rclone copy          tars (--immutable: an existing Drive file is never replaced), rainfall,
-#                           calendar, the append-only log CSVs, then MANIFEST.csv and SHA256SUMS.txt
-#   4. rclone check         every local tar matches Drive (MD5), else FAILED
+#   2. archive_raw.py       stage archive_raw/ = the Drive folder: one tar per collector per finished day
+#                           (lta_network/, lta_expressway/), nea_rainfall/, calendar/, lta_fetch_logs/,
+#                           lta_source_check/, README.txt, MANIFEST.csv, SHA256SUMS.txt
+#   3. rclone copy          tars and rainfall days with --immutable (an existing Drive file is never
+#                           replaced), then the files that change (fetch logs, calendar), manifest files last
+#   4. rclone check         every staged file matches Drive (MD5), else FAILED
 # Pings HC_PING_URL3 (Healthchecks "SLDS upload") if it is set in .Renviron. Log: archive_raw/upload.log
 # Remote: gdrive:SLDS_1.3_raw unless SLDS_REMOTE is set. Only rclone copy / check are used.
 set -uo pipefail
@@ -33,14 +35,12 @@ for try in $(seq 1 "${RAIN_TRIES:-4}"); do
 done
 step python3 analysis/archive_raw.py
 if [ $fail -eq 0 ]; then
-  for u in data_raw data_raw_expressway data_raw_desktop; do
-    [ -d "archive_raw/$u" ] && step "${RC[@]}" copy "archive_raw/$u" "$REMOTE/$u" --immutable --include "*.tar" --include "*.tar.sha256"
-    [ -d "$u" ] && step "${RC[@]}" copy "$u" "$REMOTE/$u/logs_csv" --include "/log_speedbands.csv" --include "/log_feeds.csv"
-  done
-  step "${RC[@]}" copy data_raw/nea_rainfall "$REMOTE/nea_rainfall" --exclude "*.partial"
-  step "${RC[@]}" copy data_raw/calendar "$REMOTE/calendar"
-  step "${RC[@]}" copy archive_raw "$REMOTE" --include "/MANIFEST.csv" --include "/SHA256SUMS.txt"
-  step rclone check archive_raw "$REMOTE" --one-way --include "*.tar"
+  step "${RC[@]}" copy archive_raw "$REMOTE" --immutable \
+    --include "/lta_network/*.tar" --include "/lta_expressway/*.tar" --include "/lta_source_check/*.tar" \
+    --include "/nea_rainfall/*.jsonl.gz"
+  step "${RC[@]}" copy archive_raw "$REMOTE" --include "/lta_fetch_logs/*.csv" --include "/calendar/*.json"
+  step "${RC[@]}" copy archive_raw "$REMOTE" --include "/README.txt" --include "/MANIFEST.csv" --include "/SHA256SUMS.txt"
+  step rclone check archive_raw "$REMOTE" --one-way --exclude "/upload.log" --exclude "/.upload.lock" --exclude "*.partial"
 fi
 
 url=$(grep -m1 '^HC_PING_URL3=' .Renviron 2>/dev/null | cut -d= -f2- | tr -d "\"' \r")

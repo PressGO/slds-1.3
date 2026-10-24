@@ -15,10 +15,10 @@ Status, 16 Oct 2026: LTA traffic data collected 24/7 since 14 Oct 2026 (desktop 
 | `02_linux_collector_health.ipynb` | The same checks as a notebook, read-only: services, heartbeats, speed-band fetches per hour by status, rate-limit errors, every other LTA feed (incidents, VMS, travel times, road works, road openings, Flood Alerts: on time or late, failures, changes saved, current records), expressway coverage per 5-min update (data_raw alone vs both collectors, with a chart), disk | Top to bottom; set `HOURS` to look further back |
 | `01_windows_collector_monitor.ipynb` | Windows only (desktop, now a cold spare): creates the scheduled task that keeps the collector running; health check; stop. | Cells 1–4 once per machine; cell 5 daily |
 | `analysis/get_context_data.py` | NEA 5-minute rainfall (downloaded by date), MOM public holidays, MOE school terms and F1 closure dates, written to `data_processed/` | `.venv\Scripts\python analysis\get_context_data.py` |
-| `upload_raw.sh` | Nightly backup (cron, 02:30 SGT): downloads any missing rainfall day, packs each finished day into one `.tar` per collector, copies tars, rainfall, calendar, log CSVs and `MANIFEST.csv` to the Google Drive folder `SLDS_1.3_raw` with `rclone copy` (never deletes; an uploaded tar is never replaced), then `rclone check`. Log: `archive_raw/upload.log` | cron on the Linux PC; by hand: `./upload_raw.sh; tail archive_raw/upload.log` |
-| `analysis/archive_raw.py` | Packs finished days of `data_raw*/` into `archive_raw/<unit>/<unit>_<date>.tar` with `MANIFEST.csv` and `SHA256SUMS.txt`. Reads `data_raw*/` only; a packed day is never rebuilt | Called by `upload_raw.sh`; `--dry-run` to preview |
-| `analysis/verify_raw.py` | For teammates: checks downloaded tars against `SHA256SUMS.txt` and unpacks them into the project | See "Getting the raw data" |
-| `04_process.ipynb` | Raw files → link registry, expressway speed-band panel, quality report, incidents, analysis panel (Parquet). Reads every `data_raw*/` folder (both collectors, plus the desktop's data if copied in as `data_raw_desktop/`) and removes duplicates on (link, LTA update time). | Top to bottom |
+| `upload_raw.sh` | Nightly backup (cron, 02:30 SGT): downloads any missing rainfall day, packs each finished day into one `.tar` per collector, copies them with rainfall, calendar, fetch logs and `MANIFEST.csv` to the Google Drive folder `SLDS_1.3_raw` (one folder per source) with `rclone copy` (never deletes; an uploaded tar is never replaced), then `rclone check`. Log: `archive_raw/upload.log` | cron on the Linux PC; by hand: `./upload_raw.sh; tail archive_raw/upload.log` |
+| `analysis/archive_raw.py` | Stages `archive_raw/`, an exact copy of the Drive folder: daily tars from `data_raw/` and `data_raw_expressway/`, rainfall, calendar, fetch logs, `README.txt`, `MANIFEST.csv`, `SHA256SUMS.txt`. Only reads the raw folders; a packed day is never rebuilt | Called by `upload_raw.sh`; `--dry-run` to preview |
+| `analysis/verify_raw.py` | For teammates: checks downloaded files against `SHA256SUMS.txt` and puts them into the project | See "Getting the raw data" |
+| `04_process.ipynb` | Raw files → link registry, expressway speed-band panel, quality report, incidents, analysis panel (Parquet). Reads every `data_raw*/` folder (both collectors; the desktop's 14-16 Oct data is not used, `DECISIONS.md` 24 Oct) and removes duplicates on (link, LTA update time). | Top to bottom |
 | `03_visuals.ipynb` | Maps, time–space diagrams, share of links by speed band | Cell 1, then any plot cell |
 | `analysis/00_check_sources.R`, `00_check_sources.ipynb` | One-off check of every source (run 13 Oct 2026: 315 requests, 0 failed) | Done |
 | `analysis/00_check_sources.py`, `00_check_sources_python.ipynb` | The same check in Python (standard library only); same outputs in `data_raw/source_check/` (run 16 Oct 2026: 315 requests, 0 failed) | `python3 analysis/00_check_sources.py`, or the notebook |
@@ -53,22 +53,24 @@ Not in this repository. `data_raw/` (whole network) and `data_raw_expressway/` (
 
 ## Getting the raw data
 
-The Linux PC uploads the raw data each night at about 02:30 to the Google Drive folder `SLDS_1.3_raw` (Viewer access for the team):
+The Linux PC uploads the raw data each night at about 02:30 SGT (the previous day) to the Google Drive folder `SLDS_1.3_raw`, shared with the team as Viewer. Files are only added, never deleted or replaced. `README.txt` in the folder repeats this.
 
 ```
-MANIFEST.csv  SHA256SUMS.txt            which days exist (files, size, speed-band snapshots), checksums
-data_raw/             data_raw_<date>.tar            whole network + other feeds, one tar per day
-                      data_raw_source_check.tar      13-16 Oct source check
-                      logs_csv/                      log_speedbands.csv, log_feeds.csv (whole, refreshed nightly)
-data_raw_expressway/  data_raw_expressway_<date>.tar
-data_raw_desktop/     data_raw_desktop_<date>.tar    14-16 Oct from the desktop, once copied in
-nea_rainfall/         rain_YYYYMMDD.jsonl.gz
-calendar/             mom_public_holidays_2026.json
+README.txt  MANIFEST.csv  SHA256SUMS.txt   MANIFEST: every file with date, size, SHA-256, raw files inside, speed-band snapshots
+lta_network/       lta_network_<date>.tar      whole network (data_raw/): speed bands, incidents, VMS, travel times, road works/openings
+lta_expressway/    lta_expressway_<date>.tar   expressway pages every 2 min + PUB flood alerts (data_raw_expressway/)
+lta_fetch_logs/    network_log_*.csv, expressway_log_*.csv   every fetch of both collectors, refreshed nightly
+lta_source_check/  lta_source_check_2026-10-16.tar           13-16 Oct check of every source
+nea_rainfall/      rain_YYYYMMDD.jsonl.gz      NEA 5-minute rainfall, one file per day
+calendar/          mom_public_holidays_2026.json
 ```
 
-1. Look at `MANIFEST.csv`, then download `SHA256SUMS.txt` and the tars you need into one folder, keeping the layout (e.g. `dl/SHA256SUMS.txt`, `dl/data_raw_expressway/data_raw_expressway_2026-10-20.tar`).
-2. From the repo: `python analysis/verify_raw.py dl` must end `RESULT: OK`.
-3. `python analysis/verify_raw.py dl --extract .` unpacks into `data_raw*/` (existing files are kept). Put `nea_rainfall/` and `calendar/` under `data_raw/` yourself, or run `get_context_data.py`.
+1. Open `MANIFEST.csv` to see which days exist (and `n_speedbands` per day for gaps).
+2. Download `SHA256SUMS.txt` and the files you need into one folder, keeping the folder names (e.g. `dl/SHA256SUMS.txt`, `dl/lta_expressway/lta_expressway_2026-10-20.tar`).
+3. From the repo: `python analysis/verify_raw.py dl` must end `RESULT: OK`.
+4. `python analysis/verify_raw.py dl --extract .` unpacks the tars into `data_raw/` and `data_raw_expressway/` and puts rainfall, calendar and fetch logs where the notebooks expect them. Existing files are kept.
+
+The desktop's 14-16 Oct data is not uploaded (team decision, 24 Oct): it is mostly 14 Oct, and 16 Oct is already here.
 
 ## Licence notice
 
