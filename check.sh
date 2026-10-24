@@ -28,5 +28,11 @@ PY
   fi
   echo
 done
+echo "== data.gov.sg rainfall (get_context_data.py, nightly 02:30 via upload_raw.sh) =="
+latest=$(ls data_raw/nea_rainfall/rain_*.jsonl.gz 2>/dev/null | tail -1 | sed 's/.*rain_\([0-9]*\).*/\1/')
+want=$(date -d yesterday +%Y%m%d); [ "$(date +%H%M)" -lt 0300 ] && want=$(date -d '2 days ago' +%Y%m%d)
+echo "Latest day: ${latest:-none} ($([ "${latest:-0}" -ge "$want" ] && echo OK || echo "PROBLEM: expected $want"))"
+[ -f archive_raw/upload.log ] && echo "Last nightly run: $(grep '^== .* \(OK\|FAILED\)$' archive_raw/upload.log | tail -1)"
+echo
 du -sh data_raw data_raw_expressway 2>/dev/null
 sensors 2>/dev/null | grep -iE 'package|tctl|core 0' | head -3

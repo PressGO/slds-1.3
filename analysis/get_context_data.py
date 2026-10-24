@@ -1,6 +1,7 @@
 """get_context_data.py - SLDS 42.510 project 1.3: rainfall (NEA) and calendar (MOM, MOE, LTA F1) data.
 
 Run any time; it only downloads what is missing. Standard library only (Python 3.9+).
+Exit code 1 if any rainfall day failed to download (upload_raw.sh then logs FAILED and alerts).
 
     python analysis/get_context_data.py                      # 13 Oct 2026 up to yesterday
     python analysis/get_context_data.py --start 2026-10-13 --end 2026-11-27
@@ -156,8 +157,10 @@ def rain_day_rows(path: Path) -> tuple[list[tuple[str, str, float | None]], dict
 
 
 def update_rainfall(proj: Path, start: date, end: date, headers: dict[str, str],
-                    getter: Callable = http_get, sleep: Callable[[float], None] = time.sleep) -> None:
+                    getter: Callable = http_get, sleep: Callable[[float], None] = time.sleep) -> int:
+    """Download missing days, rebuild the tidy tables. Returns the number of days that failed."""
     raw_dir = proj / "data_raw" / "nea_rainfall"
+    failed = 0
     today = datetime.now(SGT).date()
     d = start
     while d <= end:
@@ -173,6 +176,7 @@ def update_rainfall(proj: Path, start: date, end: date, headers: dict[str, str],
                 n = len(rain_day_rows(path)[0])
                 print(f"rainfall {d}: {len(lines)} page(s), {n:,} readings")
             except Exception as e:
+                failed += 1
                 print(f"rainfall {d}: FAILED ({e}); rerun the script later to retry")
         d += timedelta(days=1)
 
@@ -200,6 +204,7 @@ def update_rainfall(proj: Path, start: date, end: date, headers: dict[str, str],
             s = station_info[sid]
             w.writerow([sid, s["name"], s["lat"], s["lon"], station_days.get(sid, 0)])
     print(f"rainfall tidy table: {len(tidy):,} readings from {len(station_info)} stations")
+    return failed
 
 
 # ---- Calendar -------------------------------------------------------------------------
@@ -257,7 +262,10 @@ def main(argv: list[str] | None = None) -> int:
     if not args.skip_calendar:
         update_calendar(proj, headers)
     if not args.skip_rain:
-        update_rainfall(proj, date.fromisoformat(args.start), date.fromisoformat(args.end), headers)
+        failed = update_rainfall(proj, date.fromisoformat(args.start), date.fromisoformat(args.end), headers)
+        if failed:
+            print(f"rainfall: {failed} day(s) FAILED; exit code 1")
+            return 1
     return 0
 
 
