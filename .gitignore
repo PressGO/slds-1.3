@@ -6,8 +6,14 @@
 .env
 
 # Data: too large for Git. LTA serves only the current state, so back up data_raw/ separately.
-data_raw/
+# data_raw_*/: catch-all for any other data_raw_ copy
+# data_raw/: whole network + other feeds (lta-collector)
+# data_raw_expressway/: expressway pages every 2 min (lta-collector-expressway)
+# data_raw_desktop/: 14-16 Oct copied from the Windows desktop
 data_raw_*/
+data_raw/
+data_raw_expressway/
+data_raw_desktop/
 data_processed/
 # Packed daily tars and upload log (upload_raw.sh); the copy lives on Google Drive
 archive_raw/
