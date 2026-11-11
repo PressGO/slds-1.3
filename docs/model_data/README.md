@@ -1,6 +1,6 @@
-# SLDS 1.3 modelling tables (data version 1)
+# SLDS 1.3 modelling tables (data version 2)
 
-Built 2026-11-11T22:45:54+08:00 from git commit `cbf8755-modified` by `analysis/build_model_data.py`
+Built 2026-11-11T23:46:26+08:00 from git commit `470df0c-modified` by `analysis/build_model_data.py`
 (run through `build_processed.sh`). Every file is rebuilt from the raw data on each run, so rerunning on the same
 raw data gives the same tables. New days are added as collection goes on (same version); a change of rule, setting
 or a bug fix raises the version. Check `build_info.json` (`data_version`, `built_at`) against your copy.
@@ -8,6 +8,7 @@ or a bug fix raises the version. Check `build_info.json` (`data_version`, `built
 ## Changes
 
 - v1 (2026-11-11): First release: 2,598 expressway links, strict label rule, own/neighbour/rain features, held-out roads AYE + CTE (pending team confirmation).
+- v2 (2026-11-11): Added f_conn_* inputs: links that join an expressway (slip roads, arterials, ...), so models can be compared with and without them. Rows, labels and other columns unchanged.
 
 ## Getting the data
 
@@ -24,6 +25,7 @@ library(arrow); library(dplyr)
 tr <- read_parquet("data_processed/model/train_dev.parquet")   # small; switch to train.parquet for real fits
 tr <- tr |> filter(use, !heldout_road)                          # usable rows, held-out roads kept out
 x  <- tr |> select(starts_with("f_"))                           # every model input, no NAs
+x0 <- tr |> select(starts_with("f_"), -starts_with("f_conn_"))  # the same without the joining roads
 y  <- tr$y                                                      # outcome: unusual 15 min later
 onset <- !tr$U                                                  # primary metric: rows normal now
 ```
@@ -84,6 +86,11 @@ Both models use the same rows and the same `f_*` columns:
   (allowance for publication lag). `f_rain15_missing` / `f_rain30_missing` = 1 if the station had no reading in
   that window (its total is then 0).
 - `f_slot15` (15-minute slot of the day; 24-87 for 06:00-22:00), `f_fri` (1 = Friday).
+- `f_conn_in_d0` ... `f_conn_in_d30`, `f_conn_out_d0` ... `f_conn_out_d30`: the largest deficit among the roads that
+  lead into / out of this link (slip roads, arterials, ...; 621 links joining 559 expressway links,
+  `connectors.parquet`), against their own frozen norm (`connector_norm.parquet`), same lags and carry rule.
+  `f_conn_in_none` / `f_conn_out_none` = 1 if the link has none; `f_conn_in_missing` / `f_conn_out_missing` = 1 if one
+  lag had no value. Values are then 0. These inputs are optional: compare models with and without them.
 
 ## Other columns
 
@@ -101,7 +108,8 @@ Both models use the same rows and the same `f_*` columns:
 | `info_t_from_retrieval` | `t` is our retrieval time because LTA gave none |
 
 Other files: `links.parquet` (coordinates, `road`, `presence_week1`, `in_population`, `heldout_road`),
-`neighbours.parquet`, `norm.parquet`, `days.csv` (per day: `updates_06_22` of 192, `rows`, `share_use`),
+`neighbours.parquet`, `norm.parquet`, `connectors.parquet` (`LinkID` of the joining road, `joins` = expressway link,
+`kind` = into / out_of, its road name and category), `connector_norm.parquet`, `days.csv` (per day: `updates_06_22` of 192, `rows`, `share_use`),
 `incidents.parquet` (for label audit and error analysis; as a predictor only with incidents reported before `t`,
 never "Heavy Traffic").
 

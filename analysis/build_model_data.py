@@ -20,6 +20,8 @@ data_processed/model/ (= Drive SLDS_1.3_processed/):
     links.parquet        one row per expressway link: road, coordinates, rain station, presence, held-out road
     neighbours.parquet   link -> upstream / downstream link (end point meets start point)
     norm.parquet         frozen norm: median band per link x daytype x 15-min slot, training days only
+    connectors.parquet   links that join an expressway link (into / out of it), from 04_process
+    connector_norm.parquet   the same frozen norm for those links (for the f_conn_* inputs)
     days.csv             one row per collected day: split, in population, updates captured, rows
     incidents.parquet    copy of data_processed/incidents.parquet, for label audit and error analysis
 docs/model_data/ (in git): copies of README.md, build_info.json, days.csv and SHA256SUMS.txt from the last build.
@@ -67,8 +69,10 @@ STEP = timedelta(minutes=5)                        # LTA update interval; t is o
 
 # Data version: bump DATA_VERSION and add a line here whenever a republish changes what the tables mean
 # (a rule, setting or bug fix), not when new days are only added. Teammates compare it with their copy.
-DATA_VERSION = "1"
+DATA_VERSION = "2"
 DATA_CHANGES = [
+    ("2", "2026-11-11", "Added f_conn_* inputs: links that join an expressway (slip roads, arterials, ...), so models "
+                        "can be compared with and without them. Rows, labels and other columns unchanged."),
     ("1", "2026-11-11", "First release: 2,598 expressway links, strict label rule, own/neighbour/rain features, "
                         "held-out roads AYE + CTE (pending team confirmation)."),
 ]
@@ -114,7 +118,7 @@ def check_inputs(day_files: list[Path], today: date) -> list[str]:
     """Finished days whose analysis_panel file is older than a raw speed-band file of that day (or the next
     day's first 15 minutes, which 04_process also reads), or older than the rainfall table."""
     stale = []
-    rain_mtime = (SRC / "rainfall_5min.csv.gz").stat().st_mtime
+    rain_mtime = max((SRC / "rainfall_5min.csv.gz").stat().st_mtime, (SRC / "connector_links.parquet").stat().st_mtime)
     for f in day_files:
         day = date.fromisoformat(f.stem)
         if day >= today:
@@ -172,6 +176,18 @@ def main() -> None:
     assert panel.select(pl.struct("LinkID", "t").is_duplicated().any()).item() is False, "duplicate (LinkID, t)"
     in_window = pl.col("daytype").is_in(DAYTYPES) & pl.col("t").dt.hour().is_between(HOUR_FROM, HOUR_TO - 1)
 
+    # Links that join an expressway link (slip roads, arterials, ...: connector_links.parquet from 04_process):
+    # extra model inputs only, never rows to predict
+    conn = pl.read_parquet(SRC / "connector_links.parquet")
+    cpanel = (pl.scan_parquet(day_files)
+                .join(conn.lazy().select("LinkID").unique(), on="LinkID", how="semi")
+                .filter(pl.col("date") < today)
+                .sort("retrieved", "LinkID")
+                .unique(subset=["LinkID", "t"], keep="first")
+                .select("t", "date", "LinkID", "band", "daytype", "slot15")
+                .with_columns(split_of(pl.col("date")).alias("split"))
+                .collect())
+
     # ---- population: links with a band in >= PRESENCE_MIN of the updates captured in the first full week ----
     week = panel.filter(in_window & pl.col("date").is_between(*PRESENCE_DAYS))
     n_updates = week["t"].n_unique()
@@ -193,11 +209,14 @@ def main() -> None:
 
     # ---- norm: median band per link x daytype x 15-min slot, training weekdays only (all hours, so that the
     # lookups before 06:00 and after 22:00 also have a norm), then frozen ----
-    norm = (panel.join(keep.select("LinkID"), on="LinkID", how="semi")
-                 .filter((pl.col("split") == "train") & pl.col("daytype").is_in(DAYTYPES))
+    def norm_of(p: pl.DataFrame) -> pl.DataFrame:
+        return (p.filter((pl.col("split") == "train") & pl.col("daytype").is_in(DAYTYPES))
                  .group_by("LinkID", "daytype", "slot15")
                  .agg(pl.col("band").median().alias("norm_band"), pl.col("band").count().alias("n_obs"))
                  .sort("LinkID", "daytype", "slot15"))
+
+    norm = norm_of(panel.join(keep.select("LinkID"), on="LinkID", how="semi"))
+    cnorm = norm_of(cpanel)
 
     # ---- labels on every weekday row, before cutting to the window ----
     # low(t) = deficit >= THRESHOLD; U(s) = low at s, s-5, ... (CONSECUTIVE snapshots), known only when every
@@ -232,15 +251,19 @@ def main() -> None:
     # ---- features: only information available at t (PROJECT_PLAN §4.5) ----
     # Own deficit lags on a regular 5-min grid per link. A missing update carries the last deficit forward for at
     # most CARRY_MAX minutes (never interpolated, which would use the future); beyond that the lag is null.
-    grid = (keep.select("LinkID")
-                .join(pl.DataFrame({"t": pl.datetime_range(lab["t"].min(), lab["t"].max(), STEP, eager=True, time_unit="us")}),
-                      how="cross")
-                .join(lab.select("LinkID", "t", "deficit"), on=["LinkID", "t"], how="left")
-                .sort("LinkID", "t")
-                .with_columns(pl.col("deficit").forward_fill(limit=CARRY_MAX // 5).over("LinkID").alias("d")))
+    times = pl.DataFrame({"t": pl.datetime_range(lab["t"].min(), lab["t"].max(), STEP, eager=True, time_unit="us")})
     dcols = [f"d{m}" for m in LAGS]
-    grid = (grid.with_columns([pl.col("d").shift(m // 5).over("LinkID").alias(f"d{m}") for m in LAGS])
-                .select("LinkID", "t", *dcols))
+
+    def deficit_lags(d: pl.DataFrame, ids: pl.DataFrame) -> pl.DataFrame:
+        """d0 ... d30 per link and t from a frame of (LinkID, t, deficit)."""
+        return (ids.join(times, how="cross")
+                   .join(d.select("LinkID", "t", "deficit"), on=["LinkID", "t"], how="left")
+                   .sort("LinkID", "t")
+                   .with_columns(pl.col("deficit").forward_fill(limit=CARRY_MAX // 5).over("LinkID").alias("d"))
+                   .with_columns([pl.col("d").shift(m // 5).over("LinkID").alias(f"d{m}") for m in LAGS])
+                   .select("LinkID", "t", *dcols))
+
+    grid = deficit_lags(lab, keep.select("LinkID"))
     rows = rows.join(grid.rename({c: f"f_{c}" for c in dcols}), on=["LinkID", "t"], how="left")
 
     # Neighbour deficits at the same lags: worst (largest) deficit over the upstream / downstream links
@@ -255,6 +278,29 @@ def main() -> None:
                     .with_columns(pl.col(f"f_{side}_none").fill_null(1))
                     .with_columns([pl.when(pl.col(f"f_{side}_none") == 1).then(0.0).otherwise(pl.col(f"f_{side}_{c}"))
                                      .alias(f"f_{side}_{c}") for c in dcols]))
+
+    # Links joining the expressway (DECISIONS.md 11 Nov): the largest deficit over the links leading into
+    # (f_conn_in_*) or out of (f_conn_out_*) this link, same lags and carry rule, against their own frozen norm.
+    # No such link, or no value: 0 with a flag. They are not part of `use`, so models with and without these
+    # inputs are fitted and scored on exactly the same rows.
+    cdef = cpanel.join(cnorm.select("LinkID", "daytype", "slot15", "norm_band"), on=["LinkID", "daytype", "slot15"],
+                       how="inner").with_columns((pl.col("norm_band") - pl.col("band")).alias("deficit"))
+    cgrid = deficit_lags(cdef, conn.select("LinkID").unique().sort("LinkID"))
+    for kind, side in (("into", "in"), ("out_of", "out")):
+        p = conn.filter(pl.col("kind") == kind).select(pl.col("joins").alias("LinkID"), pl.col("LinkID").alias("nbr"))
+        names = [f"f_conn_{side}_{c}" for c in dcols]
+        agg = (need.join(p, on="LinkID", how="inner")
+                   .join(cgrid.rename({"LinkID": "nbr"}), on=["nbr", "t"], how="left")
+                   .group_by("LinkID", "t").agg([pl.col(c).max().alias(n) for c, n in zip(dcols, names)]))
+        has = p.select("LinkID").unique().with_columns(pl.lit(0, pl.Int8).alias(f"f_conn_{side}_none"))
+        rows = (rows.join(agg, on=["LinkID", "t"], how="left").join(has, on="LinkID", how="left")
+                    .with_columns(pl.col(f"f_conn_{side}_none").fill_null(1))
+                    .with_columns(((pl.col(f"f_conn_{side}_none") == 0)
+                                   & pl.any_horizontal([pl.col(n).is_null() for n in names])).cast(pl.Int8)
+                                  .alias(f"f_conn_{side}_missing"))
+                    .with_columns([pl.col(n).fill_null(0.0) for n in names]))
+    ccols = [f"f_conn_{s}_{c}" for s in ("in", "out") for c in dcols] + [
+        f"f_conn_{s}_{x}" for s in ("in", "out") for x in ("none", "missing")]
 
     # Rain at the nearest station: totals of the readings timestamped t-5 ... t-15 (f_rain15) and t-5 ... t-30
     # (f_rain30). Missing readings are skipped; if all in a window are missing its total is 0 and its flag is 1.
@@ -285,7 +331,7 @@ def main() -> None:
     ok = pl.all_horizontal([pl.col(c).is_not_null() for c in fcols])
     rows = rows.with_columns((ok & pl.col("y").is_not_null() & pl.col("U").is_not_null()).alias("use"))
     columns = (["t", "date", "LinkID", "RoadName", "daytype", "slot15", "heldout_road", "use",
-                "y", *[f"y_h{h}" for h in EXTRA_HORIZONS], "U"] + fcols
+                "y", *[f"y_h{h}" for h in EXTRA_HORIZONS], "U"] + fcols + ccols
                + [pl.col(c).alias(f"info_{c}") for c in ("band", "norm_band", "low", "rain_mm", "station_id", "station_km",
                                                          "weekday", "school_period", "olevel_venue_schools_ended", "t_from_retrieval")])
 
@@ -304,6 +350,8 @@ def main() -> None:
                 outputs["train_dev"] = part.filter(pl.col("LinkID").is_in(dev)).height
     links.write_parquet(OUT / "links.parquet", statistics=False)
     pairs.write_parquet(OUT / "neighbours.parquet", statistics=False)
+    conn.sort("joins", "kind", "LinkID").write_parquet(OUT / "connectors.parquet", statistics=False)
+    cnorm.write_parquet(OUT / "connector_norm.parquet", statistics=False)
     norm.write_parquet(OUT / "norm.parquet", statistics=False)
     if (SRC / "incidents.parquet").exists():
         shutil.copy2(SRC / "incidents.parquet", OUT / "incidents.parquet")
@@ -340,6 +388,8 @@ def main() -> None:
                          "heldout_n": HELDOUT_N, "heldout_seed": HELDOUT_SEED, "dev_links": DEV_LINKS, "dev_seed": DEV_SEED},
             "links": {"expressway": xw.height, "in_population": keep.height, "presence_updates": n_updates,
                       "neighbour_pairs": pairs.height, "heldout_roads": heldout,
+                      "connector_links": conn["LinkID"].n_unique(), "connector_pairs": conn.height,
+                      "links_with_connector": conn["joins"].n_unique(),
                       "heldout_links": keep.filter("heldout_road").height},
             "rows": outputs, "label_summary": summary,
             "inputs": {f"analysis_panel/{f.name}": sha256(f) for f in day_files}
@@ -390,6 +440,7 @@ library(arrow); library(dplyr)
 tr <- read_parquet("data_processed/model/train_dev.parquet")   # small; switch to train.parquet for real fits
 tr <- tr |> filter(use, !heldout_road)                          # usable rows, held-out roads kept out
 x  <- tr |> select(starts_with("f_"))                           # every model input, no NAs
+x0 <- tr |> select(starts_with("f_"), -starts_with("f_conn_"))  # the same without the joining roads
 y  <- tr$y                                                      # outcome: unusual 15 min later
 onset <- !tr$U                                                  # primary metric: rows normal now
 ```
@@ -449,6 +500,11 @@ Both models use the same rows and the same `f_*` columns:
   (allowance for publication lag). `f_rain15_missing` / `f_rain30_missing` = 1 if the station had no reading in
   that window (its total is then 0).
 - `f_slot15` (15-minute slot of the day; 24-87 for 06:00-22:00), `f_fri` (1 = Friday).
+- `f_conn_in_d0` ... `f_conn_in_d30`, `f_conn_out_d0` ... `f_conn_out_d30`: the largest deficit among the roads that
+  lead into / out of this link (slip roads, arterials, ...; {lk['connector_links']} links joining {lk['links_with_connector']} expressway links,
+  `connectors.parquet`), against their own frozen norm (`connector_norm.parquet`), same lags and carry rule.
+  `f_conn_in_none` / `f_conn_out_none` = 1 if the link has none; `f_conn_in_missing` / `f_conn_out_missing` = 1 if one
+  lag had no value. Values are then 0. These inputs are optional: compare models with and without them.
 
 ## Other columns
 
@@ -466,7 +522,8 @@ Both models use the same rows and the same `f_*` columns:
 | `info_t_from_retrieval` | `t` is our retrieval time because LTA gave none |
 
 Other files: `links.parquet` (coordinates, `road`, `presence_week1`, `in_population`, `heldout_road`),
-`neighbours.parquet`, `norm.parquet`, `days.csv` (per day: `updates_06_22` of 192, `rows`, `share_use`),
+`neighbours.parquet`, `norm.parquet`, `connectors.parquet` (`LinkID` of the joining road, `joins` = expressway link,
+`kind` = into / out_of, its road name and category), `connector_norm.parquet`, `days.csv` (per day: `updates_06_22` of 192, `rows`, `share_use`),
 `incidents.parquet` (for label audit and error analysis; as a predictor only with incidents reported before `t`,
 never "Heavy Traffic").
 
