@@ -1,0 +1,129 @@
+{
+  "data_version": "1",
+  "built_at": "2026-11-11T22:45:54+08:00",
+  "git_commit": "cbf8755-modified",
+  "polars": "1.44.2",
+  "settings": {
+    "categories": [
+      1
+    ],
+    "splits": {
+      "train": [
+        "2026-10-13",
+        "2026-11-06"
+      ],
+      "validate": [
+        "2026-11-07",
+        "2026-11-13"
+      ],
+      "test": [
+        "2026-11-14",
+        "2026-11-20"
+      ]
+    },
+    "daytypes": [
+      "Mon-Thu",
+      "Fri"
+    ],
+    "hours": [
+      6,
+      22
+    ],
+    "presence_days": [
+      "2026-10-19",
+      "2026-10-23"
+    ],
+    "presence_min": 0.9,
+    "threshold": 2,
+    "consecutive": 2,
+    "horizon_min": 15,
+    "extra_horizons_min": [
+      5,
+      10,
+      30
+    ],
+    "lags_min": [
+      0,
+      5,
+      10,
+      15,
+      20,
+      25,
+      30
+    ],
+    "carry_max_min": 15,
+    "neighbour_tol_m": 5,
+    "rain_lag_min": 5,
+    "heldout_n": 2,
+    "heldout_seed": 20261113,
+    "dev_links": 300,
+    "dev_seed": 1
+  },
+  "links": {
+    "expressway": 2598,
+    "in_population": 2598,
+    "presence_updates": 960,
+    "neighbour_pairs": 2596,
+    "heldout_roads": [
+      "AYER RAJAH EXPRESSWAY",
+      "CENTRAL EXPRESSWAY"
+    ],
+    "heldout_links": 689
+  },
+  "rows": {
+    "train": 7385241,
+    "train_dev": 852351,
+    "validate": 483316
+  },
+  "label_summary": {
+    "train": {
+      "use_rows": 6407469,
+      "days": 16,
+      "prevalence_U": 0.0195,
+      "prevalence_y": 0.0196,
+      "onset_rows": 6282429,
+      "onset_rows_y1": 58242,
+      "prevalence_y_onset": 0.0093
+    },
+    "validate": {
+      "use_rows": 443310,
+      "days": 1,
+      "prevalence_U": 0.031,
+      "prevalence_y": 0.0312,
+      "onset_rows": 429583,
+      "onset_rows_y1": 6303,
+      "prevalence_y_onset": 0.0147
+    }
+  },
+  "inputs": {
+    "analysis_panel/2026-10-16.parquet": "d5d3e94bbd8e9e7347c9e1a7c7cba9f776a8abe90906b79f8bac47890eaedc93",
+    "analysis_panel/2026-10-17.parquet": "d098322290ca1399560a2a154d54696ee6d851626e12323b6031931189b13403",
+    "analysis_panel/2026-10-18.parquet": "d6593514b90d8d1f72a933ec05d8061642c611904615f73d12e03e20fca7009a",
+    "analysis_panel/2026-10-19.parquet": "ccef39257675ac7846d9dcb605d9762331f757a34a88482fb35b916ce595d700",
+    "analysis_panel/2026-10-20.parquet": "890090d3d8db2207b287c144de6320448833ab9b36aee584ebab83a70cf174cc",
+    "analysis_panel/2026-10-21.parquet": "07f8bba552a7f28f94c316fe893f15a86b177f80ce9f3d263b2c8bf2712e91ce",
+    "analysis_panel/2026-10-22.parquet": "2d1157c2a3fdf219de8d4d953b4d0418ee983dc3541df72fa1d28ff315853b58",
+    "analysis_panel/2026-10-23.parquet": "a84a567642ba0a4fca7ac71d8a7f4c7f08f5334d4f84a61811cb863ef6e718eb",
+    "analysis_panel/2026-10-24.parquet": "c03f230615f935139f9666c38154835d962019d0f1ac4dea04234084ebd3b4bc",
+    "analysis_panel/2026-10-25.parquet": "e35eba260e12c42684b9ff36a7159502c330a3903eb86b8ec8d944b9a0ca65b1",
+    "analysis_panel/2026-10-26.parquet": "bb07e8a5dbd39b81f116ec59c77ce8e3ffbc22a7a930256747e458533e7a415c",
+    "analysis_panel/2026-10-27.parquet": "9718860e10910eae41af6f1c114766fa22ddb055f3e9e16f524a63a96122ba02",
+    "analysis_panel/2026-10-28.parquet": "3d4815f0825c18f8a7f441eeef4fb24254675f2be01eef40e1d98fa3b5c21566",
+    "analysis_panel/2026-10-29.parquet": "7cd8004aca02fbce20920fab4c8e9434727c82657196f6f2d8f5b65b5602527b",
+    "analysis_panel/2026-10-30.parquet": "f7865eeca6686ac4e644228370fb6c37cb31d3e3abb019d19be76e1cb9473757",
+    "analysis_panel/2026-10-31.parquet": "5350a441fe06f964a1e547d413712781b4e8d3ac5cb2d490afa5efbd7642f427",
+    "analysis_panel/2026-11-01.parquet": "bd89ec51cce7feff73763ac7b6aedb2b7bdeef60ce12999bbb9164bffbb64c41",
+    "analysis_panel/2026-11-02.parquet": "cbfc29eb3689c616e4db0f887d1eb19a8e5437f42dee8052a1b4d22f352fc49e",
+    "analysis_panel/2026-11-03.parquet": "0b1dadbd72e6f6542bdb86fee6622e13e32237d0b5b483e302973b9a3eae431d",
+    "analysis_panel/2026-11-04.parquet": "a937dcbae22aa2a9781c7c012c4ca84dc575e25af583a0e6cd54b6f3b923730e",
+    "analysis_panel/2026-11-05.parquet": "d038a07d40d9af067025689eb6436d95ee978a06ea6e85a0a84851db69e1001f",
+    "analysis_panel/2026-11-06.parquet": "cfdadae3047c4610552d6a44d276d2ce77d777788fcd9b9a6007cb7d8f355b40",
+    "analysis_panel/2026-11-07.parquet": "d5dcb87e27dc96421e88e175fe2fb5bf693be0678b52b7b6e4262a85f8c503b5",
+    "analysis_panel/2026-11-08.parquet": "457c2f4ea2d423b7489d9dcefcf62b33974bf630906f6b63d081d3861e6907cb",
+    "analysis_panel/2026-11-09.parquet": "0a329d74c4ce4f20b9a66572b5764d6152a441ba0bbb25d5a88a5d3b685fc5a6",
+    "analysis_panel/2026-11-10.parquet": "95e9d204535fb1bab6795f5ae0ebd4f5345e3a9e24d684abedb919e9ed75be6e",
+    "analysis_panel/2026-11-11.parquet": "ade64aa4b85c1d51fb65f7a2ecd9d2192602fdfcf6700fc5a223cb9784421b22",
+    "link_registry.parquet": "5ecfbae860406f271fe89dd7fa1f6cd5ce4c061ee79d34016ca04c10e78c1d0a",
+    "rainfall_5min.csv.gz": "fe50d800a158b21ed1ae5caf972a817d8035aa632a45bb66433abf9cbb61fa25"
+  }
+}

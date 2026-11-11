@@ -19,6 +19,8 @@ Status, 16 Oct 2026: LTA traffic data collected 24/7 since 14 Oct 2026 (desktop 
 | `analysis/archive_raw.py` | Stages `archive_raw/`, an exact copy of the Drive folder: daily tars from `data_raw/` and `data_raw_expressway/`, rainfall, calendar, fetch logs, `README.txt`, `MANIFEST.csv`, `SHA256SUMS.txt`. Only reads the raw folders; a packed day is never rebuilt | Called by `upload_raw.sh`; `--dry-run` to preview |
 | `analysis/verify_raw.py` | For teammates: checks downloaded files against `SHA256SUMS.txt` and puts them into the project | See "Getting the raw data" |
 | `04_process.ipynb` | Raw files → link registry, expressway speed-band panel, quality report, incidents, analysis panel (Parquet). Reads every `data_raw*/` folder (both collectors; the desktop's 14-16 Oct data is not used, `DECISIONS.md` 24 Oct) and removes duplicates on (link, LTA update time). | Top to bottom |
+| `analysis/build_model_data.py` | Modelling tables for both models: population (2,598 expressway links), frozen norm, labels `U` and `y`, features `f_*` (own and neighbour deficit lags, lagged rain, time of day), train / validate / locked test splits, held-out roads, a small dev sample, data dictionary. Writes `data_processed/model/`; rebuilt from scratch each run and refuses stale inputs | Via `build_processed.sh`; definitions in `PROJECT_PLAN.md` §4 and `DECISIONS.md` |
+| `build_processed.sh` | Rebuilds the processed data (rainfall, `04_process.ipynb` headless, `build_model_data.py`) and copies `data_processed/model/` to the Google Drive folder `SLDS_1.3_processed` (`test_locked/` stays local until the test week). Log: `data_processed/build.log` | `./build_processed.sh` (or `--no-upload`) |
 | `03_visuals.ipynb` | Maps, time–space diagrams, share of links by speed band | Cell 1, then any plot cell |
 | `analysis/00_check_sources.R`, `00_check_sources.ipynb` | One-off check of every source (run 13 Oct 2026: 315 requests, 0 failed) | Done |
 | `analysis/00_check_sources.py`, `00_check_sources_python.ipynb` | The same check in Python (standard library only); same outputs in `data_raw/source_check/` (run 16 Oct 2026: 315 requests, 0 failed) | `python3 analysis/00_check_sources.py`, or the notebook |
@@ -28,7 +30,7 @@ Status, 16 Oct 2026: LTA traffic data collected 24/7 since 14 Oct 2026 (desktop 
 
 The notebooks sit in the project folder because they use it as their working directory.
 
-Planned: processing into ~1 km expressway segments, and the modelling scripts in R (after approval).
+Planned: the modelling scripts in R (baselines, elastic net, random forest), reading `data_processed/model/`.
 
 ## Setup on a new machine
 
@@ -71,6 +73,10 @@ calendar/          mom_public_holidays_2026.json
 4. `python analysis/verify_raw.py dl --extract .` unpacks the tars into `data_raw/` and `data_raw_expressway/` and puts rainfall, calendar and fetch logs where the notebooks expect them. Existing files are kept.
 
 The desktop's 14-16 Oct data is not uploaded (team decision, 24 Oct): it is mostly 14 Oct, and 16 Oct is already here.
+
+## Getting the modelling data
+
+The tables for the models are in the Google Drive folder `SLDS_1.3_processed` (Viewer), rebuilt with `./build_processed.sh` on the Linux PC. The data dictionary, rules and R quick start are in [`docs/model_data/README.md`](docs/model_data/README.md), with the last build's record and checksums next to it. Download the files into `data_processed/model/` and check them against the checksums in git: `sha256sum -c --ignore-missing ../../docs/model_data/SHA256SUMS.txt` (run inside `data_processed/model/`). Start with `train_dev.parquet` (~9 MB). The folder's `README.md` and `build_info.json` give the data version; a change of rule or a fix raises it and is listed under "Changes".
 
 ## Licence notice
 
