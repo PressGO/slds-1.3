@@ -1,48 +1,147 @@
 {
-  "data_version": "2",
-  "built_at": "2026-11-11T23:46:26+08:00",
-  "git_commit": "470df0c-modified",
-  "polars": "1.44.2",
-  "settings": {
-    "categories": [
-      1
-    ],
-    "splits": {
-      "train": [
-        "2026-10-13",
-        "2026-11-06"
-      ],
-      "validate": [
-        "2026-11-07",
-        "2026-11-13"
-      ],
-      "test": [
-        "2026-11-14",
-        "2026-11-20"
-      ]
+  "data_version": "3",
+  "built_at": "2026-11-14T20:42:10+08:00",
+  "built_as_of": "2026-11-14 20:36",
+  "git_commit": "e2276a8",
+  "code_sha256": {
+    "analysis/data_settings.py": "e7cfbbe674e2c7ce01f6bae8bd960101c07c7c4633cfe06cb985088220424182",
+    "analysis/data_steps.py": "50606870b1270c9701289bd3d283198e013c758fca53adcd757739ca7947b1ea",
+    "analysis/build_data.py": "85150b4de74dc504eb138dd7b29d1ae74d33b87358f82d2aa73203bf4624483d",
+    "analysis/test_data_steps.py": "05683d984e6644821163764f1454a9f2abd6a6c56ec565c7a81707a5d9975156"
+  },
+  "software": {
+    "python": "3.12.2",
+    "polars": "1.44.2",
+    "numpy": "2.5.4"
+  },
+  "days": {
+    "first": "2026-10-16",
+    "last_finished": "2026-11-13",
+    "by_split": {
+      "train": 24,
+      "validate": 5,
+      "test": 0
+    }
+  },
+  "links": {
+    "registry": 143787,
+    "expressway": 2598,
+    "in_population": 2598,
+    "roads": 12,
+    "presence_week1_updates": 960,
+    "neighbour_pairs": 2596,
+    "joining_roads": 621,
+    "joining_pairs": 635,
+    "expressway_links_with_joining_road": 559,
+    "rain_stations_eligible": 81,
+    "rain_stations_used": 57
+  },
+  "speed_band_cleaning": {
+    "rows_read": 48562028,
+    "no_update_time": 0,
+    "no_retrieval_time": 0,
+    "band_outside_1_8": 0,
+    "link_updates_fetched_twice_or_more": 22305695,
+    "conflicts": 0,
+    "rows_kept": 25161360,
+    "longest_fetch_delay_min": 165,
+    "latest_after_midnight_min": 5,
+    "rows_in_finished_days": 25128190
+  },
+  "rows": {
+    "extra/full_table.parquet": 14465664,
+    "train.parquet": {
+      "train": 9805350,
+      "validate": 2082254
     },
-    "daytypes": [
-      "Mon-Thu",
-      "Fri"
+    "extra/train_sample.parquet": 1373251,
+    "extra/incidents.parquet": 9723,
+    "extra/train_lodo.parquet": 9805350
+  },
+  "label_summary": {
+    "train": {
+      "days": 24,
+      "use_rows": 9805350,
+      "share_U": 0.0174,
+      "share_y": 0.0174,
+      "onset_rows": 9634799,
+      "onset_rows_y_true": 77120,
+      "share_y_onset": 0.008
+    },
+    "validate": {
+      "days": 5,
+      "use_rows": 2082254,
+      "share_U": 0.0202,
+      "share_y": 0.0204,
+      "onset_rows": 2040212,
+      "onset_rows_y_true": 21604,
+      "share_y_onset": 0.0106
+    },
+    "train_lodo": {
+      "days": 24,
+      "use_rows": 9805350,
+      "share_U": 0.0189,
+      "share_y": 0.019,
+      "onset_rows": 9619900,
+      "onset_rows_y_true": 82502,
+      "share_y_onset": 0.0086
+    }
+  },
+  "settings": {
+    "DATA_VERSION": "3",
+    "SPEED_SOURCES": [
+      "data_raw",
+      "data_raw_expressway"
     ],
-    "hours": [
-      6,
-      22
-    ],
-    "presence_days": [
+    "REGISTRY_SOURCE": "data_raw",
+    "INCIDENT_SOURCE": "data_raw",
+    "LATE_ROWS_MIN": 60,
+    "FINISHED_AFTER_H": 2,
+    "BAD_ROWS_MAX_SHARE": 0.001,
+    "EXPRESSWAY_CATEGORY": 1,
+    "EXPECTED_EXPRESSWAY_LINKS": 2598,
+    "PRESENCE_DAYS": [
       "2026-10-19",
       "2026-10-23"
     ],
-    "presence_min": 0.9,
-    "threshold": 2,
-    "consecutive": 2,
-    "horizon_min": 15,
-    "extra_horizons_min": [
+    "PRESENCE_MIN": 0.9,
+    "ROAD_GROUPS": {
+      "KALLANG PAYA LEBAR EXPRESSWAY TUNNEL": "KALLANG PAYA LEBAR EXPRESSWAY"
+    },
+    "NEIGHBOUR_TOL_M": 5,
+    "CONNECTOR_TOL_M": 5,
+    "HOUR_FROM": 6,
+    "HOUR_TO": 22,
+    "SPLITS": {
+      "train": [
+        "2026-10-16",
+        "2026-11-08"
+      ],
+      "validate": [
+        "2026-11-09",
+        "2026-11-15"
+      ],
+      "test": [
+        "2026-11-16",
+        "2026-11-22"
+      ]
+    },
+    "NORM_SPLIT": "train",
+    "DAYTYPES": [
+      "weekday",
+      "saturday",
+      "sunday_or_holiday"
+    ],
+    "THRESHOLD": 2,
+    "CONSECUTIVE": 2,
+    "HORIZON": 15,
+    "EXTRA_HORIZONS": [
       5,
       10,
       30
     ],
-    "lags_min": [
+    "STEP_MIN": 5,
+    "LAGS": [
       0,
       5,
       10,
@@ -51,82 +150,584 @@
       25,
       30
     ],
-    "carry_max_min": 15,
-    "neighbour_tol_m": 5,
-    "rain_lag_min": 5,
-    "heldout_n": 2,
-    "heldout_seed": 20261113,
-    "dev_links": 300,
-    "dev_seed": 1
-  },
-  "links": {
-    "expressway": 2598,
-    "in_population": 2598,
-    "presence_updates": 960,
-    "neighbour_pairs": 2596,
-    "heldout_roads": [
-      "AYER RAJAH EXPRESSWAY",
-      "CENTRAL EXPRESSWAY"
-    ],
-    "connector_links": 621,
-    "connector_pairs": 635,
-    "links_with_connector": 559,
-    "heldout_links": 689
-  },
-  "rows": {
-    "train": 7385241,
-    "train_dev": 852351,
-    "validate": 483316
-  },
-  "label_summary": {
-    "train": {
-      "use_rows": 6407469,
-      "days": 16,
-      "prevalence_U": 0.0195,
-      "prevalence_y": 0.0196,
-      "onset_rows": 6282429,
-      "onset_rows_y1": 58242,
-      "prevalence_y_onset": 0.0093
+    "CARRY_MAX": 5,
+    "RAIN_LAG": 5,
+    "RAIN_WINDOWS": {
+      "f_rain15": 15,
+      "f_rain30": 30
     },
-    "validate": {
-      "use_rows": 443310,
-      "days": 1,
-      "prevalence_U": 0.031,
-      "prevalence_y": 0.0312,
-      "onset_rows": 429583,
-      "onset_rows_y1": 6303,
-      "prevalence_y_onset": 0.0147
-    }
+    "RAIN_STATION_MIN_SHARE": 0.8,
+    "RAIN_DAY_MIN_SHARE": 0.8,
+    "WEEKDAY_COLUMNS": [
+      "f_mon",
+      "f_tue",
+      "f_wed",
+      "f_thu",
+      "f_fri",
+      "f_sat",
+      "f_sun"
+    ],
+    "SAMPLE_LINKS": 300,
+    "SAMPLE_SEED": 1,
+    "SHARE_TEST_ENV": "SHARE_TEST"
   },
   "inputs": {
-    "analysis_panel/2026-10-16.parquet": "3149ab5beb7927855f4a110e0b845ae089e8ecab3cbbf1686e848cf65fbebe1a",
-    "analysis_panel/2026-10-17.parquet": "9a0e6059e0a60357fbb3848c612ddb0ee7da29dcda49c364dff5293da6a4e2fc",
-    "analysis_panel/2026-10-18.parquet": "f804eb0e6fd5e89e5716ebe9897ce93a2972091f16369c48fd80a32f7c3ad696",
-    "analysis_panel/2026-10-19.parquet": "548d7f1e23d60944bdb7ba3de8e9f83ef23e4e8c30a6c59b0575aecbd4455f6d",
-    "analysis_panel/2026-10-20.parquet": "9b0945f22e30e5b8c3ce877b687d26c8a7259001afc830ce4053b53206718f95",
-    "analysis_panel/2026-10-21.parquet": "b3e031a1bfd56de787303852914699e7aa122fd1a31d5aad6a22f1a58e4924f7",
-    "analysis_panel/2026-10-22.parquet": "c54101d8832203afd9c88ce3425c44f93e306ca0eaff19b911409a00c60512f2",
-    "analysis_panel/2026-10-23.parquet": "5db6dc89ee204bc04aaf3be43d62eacdf9390011ef0eb9361fecd01df57250da",
-    "analysis_panel/2026-10-24.parquet": "1a8aad71ec4a5b53d7e6448cf73c63f443b8501a5c82e54df22823e94f8cae30",
-    "analysis_panel/2026-10-25.parquet": "7e0e0b5d9ff208bc15b167d1d8f4f4d71d2cfe0ebd7445bdc7feb10f0f83e758",
-    "analysis_panel/2026-10-26.parquet": "af4d54da8f29b3e7f294d9dc3fd2719c07044fad3c64f1e8fb0f2acfc8c444db",
-    "analysis_panel/2026-10-27.parquet": "c879a0295d7637385f616ef7b0c51c267fa8fe0e05fd101ee20f680139581019",
-    "analysis_panel/2026-10-28.parquet": "72fd0c73620d7aa8b22825530e278889e34e8e902dc24546b7a6651521d4901d",
-    "analysis_panel/2026-10-29.parquet": "6c282b0c8813f18dcec1cbbd5336b49b9550c99b28c3ca730b439478cf66f226",
-    "analysis_panel/2026-10-30.parquet": "fc740d3e8ae4f970a845a15784bd5423794dbd3e4149350d68a89cf0daa20a17",
-    "analysis_panel/2026-10-31.parquet": "3e6f1ec2218ebbab786778137cf88f08783281edb86793fb39d1ba96fbc405cf",
-    "analysis_panel/2026-11-01.parquet": "db5ffa69029854f39588c163f1de990892be2a0118907206e3414d62c51cb9c8",
-    "analysis_panel/2026-11-02.parquet": "932af0b11c007e267061cbac7df1a8760da5fcf5f4ba51ea8e332375c7255262",
-    "analysis_panel/2026-11-03.parquet": "ba7c929caaab0bc96e586e35d28f184d00cabaac67b5b5b60329ae548611d05a",
-    "analysis_panel/2026-11-04.parquet": "908e4a562d6d9819adc48e15c6cf312132db8011dd73bdb5961b46b72fbdd486",
-    "analysis_panel/2026-11-05.parquet": "a33c1c447c0edd5325374e629e8c38953939941171825609347d40ab12b4e2ed",
-    "analysis_panel/2026-11-06.parquet": "32213611a48b7b0823828e69782d1f9c12679538cfb76f1ccbd05544714563de",
-    "analysis_panel/2026-11-07.parquet": "2c9be3d0ebc717f4e93bede2afd40794b8cca977fe26d9a0eaaf01eed0e84864",
-    "analysis_panel/2026-11-08.parquet": "a60592aaa70822d6aea802dc4b240db988996cfc0763bac8390f2b0a0d4dfa39",
-    "analysis_panel/2026-11-09.parquet": "7fb853ccd8ed813bfcdbb00eb9f255f35fe81d88fa3df3feaa95aadcfa6d96eb",
-    "analysis_panel/2026-11-10.parquet": "5ef7eba491593890af818c076f6eefe59ba8ffc2e32e2d519b9bf9ee61abeada",
-    "analysis_panel/2026-11-11.parquet": "3327ecd9abef74ace57a9ef0d8023f1c4c8b4b7baf4c028d9effe86fbbd753e7",
-    "link_registry.parquet": "04f388b4f6ef3a630996da84b0a105d7d8ea83ed848256c5f344cecaee713f4e",
-    "rainfall_5min.csv.gz": "24192021b0155b647eb2e9ced10a6e12f9e8f425123c8fd1fc2cac3cecd86aad"
-  }
+    "speed_band_files": {
+      "files": 26862,
+      "bytes": 4041900615,
+      "digest": "7634d019e8a17a1b93cdc05757b04f0f7b9d97c902fa891313daca2d1e2f0fa3"
+    },
+    "registry_files": {
+      "files": 684,
+      "bytes": 1978360800,
+      "digest": "eac0eb203138e668e685eca8bb346b6f6e359bc01e099b9bb47d9fbdb4c54bfe"
+    },
+    "incident_files": {
+      "files": 10508,
+      "bytes": 12358236,
+      "digest": "b3ecad0f39b42719f42472504e4ce8d16acdef6cd9447cda3cd2f58e5ac03d19"
+    },
+    "rainfall_5min.csv.gz": "7682878d29c86cf65d5a09e2ff0d49350c70247eee436dd67e6276844a728645",
+    "rain_stations.csv": "c8cb88272b423f48ecd8dee3f35d4a1b35a12b480cb5ea501eafdbd2e954394c",
+    "calendar_2026.csv": "bb57fc2be514df34b087ad85becc86334d0fd4f6218fd3a32b05a829622c3c1f"
+  },
+  "checks": [
+    {
+      "check": "calendar: one row per date",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "calendar: Deepavali (Sun 8 Nov) and its holiday (Mon 9 Nov) are public holidays",
+      "ok": true,
+      "detail": "['2026-11-08', '2026-11-09', '2026-12-25']"
+    },
+    {
+      "check": "rainfall: every timestamp parses",
+      "ok": true,
+      "detail": "0 not parsed"
+    },
+    {
+      "check": "rainfall: one reading per station and time",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "rainfall: readings are >= 0 mm and whole tenths of a mm",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "rainfall: times on the 5-min grid",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "at least the first training day is finished",
+      "ok": true,
+      "detail": "cutoff 2026-11-13"
+    },
+    {
+      "check": "calendar covers every day",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "registry: raw snapshot files found",
+      "ok": true,
+      "detail": "684"
+    },
+    {
+      "check": "registry: every snapshot file read",
+      "ok": true,
+      "detail": "684"
+    },
+    {
+      "check": "registry: >= 95% of snapshot files have all 288 pages",
+      "ok": true,
+      "detail": "684 of 684"
+    },
+    {
+      "check": "registry: every record has a LinkID",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "registry: coordinates parse for every link",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "registry: expressway links = the 2,598 in DECISIONS.md (if LTA changed its links, that needs a decision)",
+      "ok": true,
+      "detail": "2598"
+    },
+    {
+      "check": "registry: no expressway link changed road category",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "registry: expressway links whose name or coordinates changed (latest used)",
+      "ok": true,
+      "detail": "0"
+    },
+    {
+      "check": "joining roads: none is an expressway link",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "joining roads: every gap <= tolerance",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "speed bands: files found in both collector folders",
+      "ok": true,
+      "detail": "26862"
+    },
+    {
+      "check": "speed bands: rows without LTA's update time (dropped) at most 0.1%",
+      "ok": true,
+      "detail": "0"
+    },
+    {
+      "check": "speed bands: every row has a retrieval time",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "speed bands: SpeedBand outside 1-8 (band left empty) at most 0.1%",
+      "ok": true,
+      "detail": "0"
+    },
+    {
+      "check": "speed bands: a link and update fetched twice never disagree",
+      "ok": true,
+      "detail": "0 conflicts in 22,305,695 repeats"
+    },
+    {
+      "check": "speed bands: rows of a day fetched after midnight all arrive within the late-file window",
+      "ok": true,
+      "detail": "latest 5 min after midnight; longest delay overall 165 min"
+    },
+    {
+      "check": "panel: one row per link and update",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "panel: every update time on the 5-min grid",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "panel: every finished day has data",
+      "ok": true,
+      "detail": "29 of 29 days"
+    },
+    {
+      "check": "population: every expressway link kept (presence >= 90%)",
+      "ok": true,
+      "detail": "2598; presence 0.940-0.969 of 960 updates"
+    },
+    {
+      "check": "neighbours: every gap <= tolerance",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "neighbours: no link is its own neighbour",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "rain: stations with readings in >= 80% of slots on every training day",
+      "ok": true,
+      "detail": "81 of 90"
+    },
+    {
+      "check": "rain: every link has a station within 10 km",
+      "ok": true,
+      "detail": "max 3.7 km"
+    },
+    {
+      "check": "rain: every finished day has readings in >= 80% of the used stations' slots (else re-download that day)",
+      "ok": true,
+      "detail": "lowest 0.920"
+    },
+    {
+      "check": "norm: built from training days only (n_days <= training days of that type)",
+      "ok": true,
+      "detail": "{'saturday': 4, 'sunday_or_holiday': 4, 'weekday': 16}"
+    },
+    {
+      "check": "norm: every value between 1 and 8",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "norm: link x day type x slot cells missing for 05:30-22:44 (rows there get no label)",
+      "ok": true,
+      "detail": "0 of 537,786"
+    },
+    {
+      "check": "norm: 2,000 cells recomputed with numpy give the same median",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "rows: one per link and 5-min time, 06:00-22:00, finished days",
+      "ok": true,
+      "detail": "14,465,664"
+    },
+    {
+      "check": "rows: the input steps kept every row (no join added or lost one)",
+      "ok": true,
+      "detail": "14,465,664"
+    },
+    {
+      "check": "rows: one row per link and time",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: every row has its split, day type and road",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: use rows: no input, y or U missing",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: use rows: band captured now, and f_d0 is the real drop now (never reused)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: U is null exactly when the drop now or 5 min ago is missing",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: y equals U 15 min later (time join)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_d5 equals f_d0 5 min earlier (time join)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_d15 equals f_d0 15 min earlier (time join)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_d30 equals f_d0 30 min earlier (time join)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_up_d5 equals f_up_d0 5 min earlier (time join)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_up_d30 equals f_up_d0 30 min earlier (time join)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_dn_d5 equals f_dn_d0 5 min earlier (time join)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_dn_d30 equals f_dn_d0 30 min earlier (time join)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_conn_in_d5 equals f_conn_in_d0 5 min earlier (time join)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_conn_in_d30 equals f_conn_in_d0 30 min earlier (time join)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_conn_out_d5 equals f_conn_out_d0 5 min earlier (time join)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_conn_out_d30 equals f_conn_out_d0 30 min earlier (time join)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_dn_d0 = the f_d0 of the only downstream link at the same t",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_up_d0 = the f_d0 of the only upstream link at the same t",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_conn_in_d0 = the drop of the only joining road at the same t (0 if missing)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_conn_out_d0 = the drop of the only joining road at the same t (0 if missing)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: low = drop >= 2",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_n_filled is 0-7, and 0-5 on use rows (now and 5 min ago are never reused there)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: exactly one of f_mon ... f_sun is 1",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_holiday matches the public-holiday list",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: day type matches weekday and holiday",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: f_slot15 is 24-87 (06:00-22:00)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: rain totals are 0 or whole tenths of a mm (no leftovers below 0.1 mm, never below 0)",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: rain over 15 min <= rain over 30 min",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: rain missing flag = 1 only with a total of 0",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "rows: split matches the date",
+      "ok": true,
+      "detail": "29 days"
+    },
+    {
+      "check": "labels: share of unusual rows (U) in train is 0.5%-10%",
+      "ok": true,
+      "detail": "0.0174"
+    },
+    {
+      "check": "incidents: read every saved snapshot",
+      "ok": true,
+      "detail": "10508"
+    },
+    {
+      "check": "written: train.parquet holds every row once",
+      "ok": true,
+      "detail": "11,887,604 rows"
+    },
+    {
+      "check": "written: extra/full_table.parquet holds every row once",
+      "ok": true,
+      "detail": "14,465,664 rows"
+    },
+    {
+      "check": "lodo: each day's normal level leaves out exactly that day",
+      "ok": true,
+      "detail": "0 cells differ"
+    },
+    {
+      "check": "lodo rows: one row per link and time",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: every row has its split, day type and road",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: use rows: no input, y or U missing",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: use rows: band captured now, and f_d0 is the real drop now (never reused)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: U is null exactly when the drop now or 5 min ago is missing",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: y equals U 15 min later (time join)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_d5 equals f_d0 5 min earlier (time join)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_d15 equals f_d0 15 min earlier (time join)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_d30 equals f_d0 30 min earlier (time join)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_up_d5 equals f_up_d0 5 min earlier (time join)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_up_d30 equals f_up_d0 30 min earlier (time join)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_dn_d5 equals f_dn_d0 5 min earlier (time join)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_dn_d30 equals f_dn_d0 30 min earlier (time join)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_conn_in_d5 equals f_conn_in_d0 5 min earlier (time join)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_conn_in_d30 equals f_conn_in_d0 30 min earlier (time join)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_conn_out_d5 equals f_conn_out_d0 5 min earlier (time join)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_conn_out_d30 equals f_conn_out_d0 30 min earlier (time join)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_dn_d0 = the f_d0 of the only downstream link at the same t",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_up_d0 = the f_d0 of the only upstream link at the same t",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_conn_in_d0 = the drop of the only joining road at the same t (0 if missing)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_conn_out_d0 = the drop of the only joining road at the same t (0 if missing)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: low = drop >= 2",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_n_filled is 0-7, and 0-5 on use rows (now and 5 min ago are never reused there)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: exactly one of f_mon ... f_sun is 1",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_holiday matches the public-holiday list",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: day type matches weekday and holiday",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: f_slot15 is 24-87 (06:00-22:00)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: rain totals are 0 or whole tenths of a mm (no leftovers below 0.1 mm, never below 0)",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: rain over 15 min <= rain over 30 min",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: rain missing flag = 1 only with a total of 0",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "lodo rows: split matches the date",
+      "ok": true,
+      "detail": "24 days"
+    },
+    {
+      "check": "written: train_lodo.parquet holds every usable row once",
+      "ok": true,
+      "detail": "9,805,350 rows"
+    }
+  ],
+  "peak_memory_mb": 9249,
+  "seconds": 320
 }
