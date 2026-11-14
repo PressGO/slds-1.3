@@ -557,7 +557,7 @@ slds-1.3-congestion/
 ├── .Renviron                  API keys: never committed
 ├── 01_windows_collector_monitor.ipynb set up, start and health-check the collector
 ├── 03_visuals.ipynb           maps, time–space diagrams, band shares
-├── 04_process.ipynb           raw → link registry, panel, incidents, analysis panel
+├── build_processed.sh         raw → model tables (analysis/build_data.py) → Drive SLDS_1.3_processed
 ├── analysis/
 │   ├── lta_collector.py       24/7 LTA collector (Python standard library)
 │   ├── get_context_data.py    NEA rainfall + calendar (MOM, MOE, F1)

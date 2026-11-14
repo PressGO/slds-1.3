@@ -18,9 +18,12 @@ Status, 16 Oct 2026: LTA traffic data collected 24/7 since 14 Oct 2026 (desktop 
 | `upload_raw.sh` | Nightly backup (cron, 02:30 SGT): downloads any missing rainfall day, packs each finished day into one `.tar` per collector, copies them with rainfall, calendar, fetch logs and `MANIFEST.csv` to the Google Drive folder `SLDS_1.3_raw` (one folder per source) with `rclone copy` (never deletes; an uploaded tar is never replaced), then `rclone check`. Log: `archive_raw/upload.log` | cron on the Linux PC; by hand: `./upload_raw.sh; tail archive_raw/upload.log` |
 | `analysis/archive_raw.py` | Stages `archive_raw/`, an exact copy of the Drive folder: daily tars from `data_raw/` and `data_raw_expressway/`, rainfall, calendar, fetch logs, `README.txt`, `MANIFEST.csv`, `SHA256SUMS.txt`. Only reads the raw folders; a packed day is never rebuilt | Called by `upload_raw.sh`; `--dry-run` to preview |
 | `analysis/verify_raw.py` | For teammates: checks downloaded files against `SHA256SUMS.txt` and puts them into the project | See "Getting the raw data" |
-| `04_process.ipynb` | Raw files → link registry, expressway speed-band panel, quality report, incidents, analysis panel (Parquet). Reads every `data_raw*/` folder (both collectors; the desktop's 14-16 Oct data is not used, `DECISIONS.md` 24 Oct) and removes duplicates on (link, LTA update time). | Top to bottom |
-| `analysis/build_model_data.py` | Modelling tables for both models: population (2,598 expressway links), frozen norm, labels `U` and `y`, features `f_*` (own and neighbour deficit lags, lagged rain, time of day), train / validate / locked test splits, held-out roads, a small dev sample, data dictionary. Writes `data_processed/model/`; rebuilt from scratch each run and refuses stale inputs | Via `build_processed.sh`; definitions in `PROJECT_PLAN.md` §4 and `DECISIONS.md` |
-| `build_processed.sh` | Rebuilds the processed data (rainfall, `04_process.ipynb` headless, `build_model_data.py`) and copies `data_processed/model/` to the Google Drive folder `SLDS_1.3_processed` (`test_locked/` stays local until the test week). Log: `data_processed/build.log` | `./build_processed.sh` (or `--no-upload`) |
+| `analysis/build_data.py` | Raw files → model tables (data version 3; replaces `04_process.ipynb` and `build_model_data.py`, 14 Nov). Reads only `data_raw/`, `data_raw_expressway/` and the rainfall and calendar tables; rebuilds everything from scratch on every run (no cache), so the same raw files give the same tables. Checks every step and stops with `CHECK FAILED` if a check fails; every check and its result is listed in `extra/build_info.json`. Writes to temporary folders that are swapped in only at the end, so a failed build never leaves half-written files. Writes `data_processed/model/` (the Drive copy) and `docs/model_data/` | Via `build_processed.sh` |
+| `analysis/data_settings.py` | Every setting of the data pipeline in one place (dates, splits, label rule, look-backs), each with the decision behind it. A change here is a decision: `DECISIONS.md` first | Read only |
+| `analysis/data_steps.py` | The steps of the pipeline as small functions (tables in, tables out): cleaning, registry, neighbours, joining roads, normal level, labels, inputs, incidents | Used by `build_data.py` |
+| `analysis/test_data_steps.py` | Tests every step on small made-up data with answers worked out by hand | `.venv/bin/python analysis/test_data_steps.py -v` |
+| `analysis/verify_data.py` | Independent check: recomputes sample rows of the finished tables straight from the raw files, written from the rules only (not from the pipeline code) | Via `build_processed.sh` |
+| `build_processed.sh` | Rainfall download, tests, `build_data.py` (memory capped at 14 GB so the collectors are safe), `verify_data.py`, then copies `data_processed/model/` to the Google Drive folder `SLDS_1.3_processed` (test files only with `SHARE_TEST=1`). Stops at the first failure. Log: `data_processed/build.log` | `./build_processed.sh` (or `--no-upload`) |
 | `03_visuals.ipynb` | Maps, time–space diagrams, share of links by speed band | Cell 1, then any plot cell |
 | `analysis/00_check_sources.R`, `00_check_sources.ipynb` | One-off check of every source (run 13 Oct 2026: 315 requests, 0 failed) | Done |
 | `analysis/00_check_sources.py`, `00_check_sources_python.ipynb` | The same check in Python (standard library only); same outputs in `data_raw/source_check/` (run 16 Oct 2026: 315 requests, 0 failed) | `python3 analysis/00_check_sources.py`, or the notebook |
@@ -30,7 +33,7 @@ Status, 16 Oct 2026: LTA traffic data collected 24/7 since 14 Oct 2026 (desktop 
 
 The notebooks sit in the project folder because they use it as their working directory.
 
-Planned: the modelling scripts in R (baselines, elastic net, random forest), reading `data_processed/model/`.
+Planned: the modelling scripts in R (baselines, elastic net, random forest), reading `data_processed/model/train.parquet`.
 
 ## Setup on a new machine
 
@@ -47,7 +50,7 @@ Planned: the modelling scripts in R (baselines, elastic net, random forest), rea
 
    `HC_PING_URL` (e-mail alert when collection stops) and `DATA_GOV_KEY` (higher rate limit) are optional. The `...2` lines are only needed on the PC that runs the expressway collector. LTA's rate limit (about 4,000 calls an hour, resetting on the hour; not published) is per key, so each collector needs its own key.
 3. To collect on Windows: run `01_windows_collector_monitor.ipynb` cells 1–4, and keep the machine awake and signed in. On Linux: a systemd service; see `docs/LINUX_SETUP_FOR_CLAUDE_CODE.md`. Collection needs no Python packages.
-4. To process: run `get_context_data.py`, then `04_process.ipynb`.
+4. To process: `./build_processed.sh --no-upload` (rainfall, tests, build, independent check).
 
 ## Data
 
@@ -76,7 +79,17 @@ The desktop's 14-16 Oct data is not uploaded (team decision, 24 Oct): it is most
 
 ## Getting the modelling data
 
-The tables for the models are in the Google Drive folder `SLDS_1.3_processed` (Viewer), rebuilt with `./build_processed.sh` on the Linux PC. The data dictionary, rules and R quick start are in [`docs/model_data/README.md`](docs/model_data/README.md), with the last build's record and checksums next to it. Download the files into `data_processed/model/` and check them against the checksums in git: `sha256sum -c --ignore-missing ../../docs/model_data/SHA256SUMS.txt` (run inside `data_processed/model/`). Start with `train_dev.parquet` (~9 MB). The folder's `README.md` and `build_info.json` give the data version; a change of rule or a fix raises it and is listed under "Changes".
+The tables for the models are in the Google Drive folder `SLDS_1.3_processed` (Viewer), rebuilt with `./build_processed.sh` on the Linux PC.
+
+```
+README.md        what every column means, the rules, R quick start (also in docs/model_data/README.md)
+train.parquet    the rows to train on; column split = "train" (fit) or "validate" (tune)
+test.parquet     the test week, added after it ends and the plan is frozen
+extra/           everything else: a small sample, the full table with info_ columns, links, neighbours,
+                 joining roads, normal levels, days.csv, incidents, build_info.json, SHA256SUMS.txt
+```
+
+Download what you need into `data_processed/model/` (keep `extra/` as a folder), then check it there: `sha256sum -c --ignore-missing ../../docs/model_data/SHA256SUMS.txt`. To try code quickly, start with `extra/train_sample.parquet`. `README.md` and `extra/build_info.json` give the data version; a change of rule raises it and is listed under "Changes".
 
 ## Licence notice
 

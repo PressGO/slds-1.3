@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Rebuild the processed data from data_raw*/ and share the modelling tables on Google Drive. Run by hand.
-#   1. get_context_data.py        rainfall for any finished day still missing, calendar
-#   2. 04_process.ipynb           raw -> data_processed/ (registry, panel, analysis_panel, incidents), run
-#                                 headless; a day is redone whenever its inputs are newer than its output
-#   3. build_model_data.py        data_processed/ -> data_processed/model/ (population, norm, labels, splits),
-#                                 rebuilt from scratch each run
-#   4. rclone copy + check        data_processed/model/ -> Drive SLDS_1.3_processed (changed files are
-#                                 replaced, nothing is deleted); test_locked/ only with SHARE_TEST=1
-#   ./build_processed.sh              build and upload
-#   ./build_processed.sh --no-upload  build only
+# Rebuild the model data from the raw files and share it on Google Drive. Run by hand on the Linux PC.
+#   1. get_context_data.py    rainfall for any finished day still missing, calendar
+#   2. test_data_steps.py     tests of every step on made-up data; stop if one fails
+#   3. build_data.py          raw files -> data_processed/model/ (from scratch, with checks; memory capped
+#                             at 14 GB so the collectors on this PC are never short of memory)
+#   4. verify_data.py         independent recomputation of sample rows from the raw files; stop on any mismatch
+#   5. rclone copy + check    data_processed/model/ -> Drive SLDS_1.3_processed. Nothing on Drive is deleted.
+#                             test.parquet and extra/test_full.parquet only with SHARE_TEST=1 (after the freeze)
+#   ./build_processed.sh              build, check and upload
+#   ./build_processed.sh --no-upload  build and check only
 # Log: data_processed/build.log. Remote: gdrive:SLDS_1.3_processed unless SLDS_PROCESSED_REMOTE is set.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -19,19 +19,31 @@ exec > >(tee -a data_processed/build.log) 2>&1
 exec 9>data_processed/.build.lock
 flock -n 9 || { echo "another build is running; exiting"; exit 1; }
 
+capped() {  # run with at most 14 GB of memory, if this session can create a systemd scope
+  if systemd-run --user --scope -q -p MemoryMax=1G true 2>/dev/null; then
+    systemd-run --user --scope -q -p MemoryMax=14G -p MemorySwapMax=1G nice -n 10 "$@"
+  else
+    echo "WARN: no memory cap (systemd-run --user not available here)"; nice -n 10 "$@"
+  fi
+}
+
 echo "== $(date '+%F %T') start"
 echo "-- get_context_data.py"; nice -n 10 python3 analysis/get_context_data.py
-echo "-- 04_process.ipynb"
-run=$(mktemp -d)
-trap 'rm -rf "$run"' EXIT
-nice -n 10 .venv/bin/jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=-1 \
-  04_process.ipynb --output-dir "$run" --output 04_process_run.ipynb
-echo "-- build_model_data.py"; nice -n 10 "$PY" analysis/build_model_data.py
+echo "-- test_data_steps.py"; "$PY" analysis/test_data_steps.py
+[ -f analysis/verify_data.py ] || { echo "analysis/verify_data.py is missing: nothing is uploaded"; exit 1; }
+echo "-- build_data.py"; capped "$PY" analysis/build_data.py
+echo "-- verify_data.py"; capped "$PY" analysis/verify_data.py
 if [ "${1:-}" != "--no-upload" ]; then
   echo "-- upload to $REMOTE"
-  # test_locked/ stays on this PC until the plan is frozen; set SHARE_TEST=1 to upload it at test time
-  ex=(); [ "${SHARE_TEST:-0}" = 1 ] || ex=(--exclude "/test_locked/**")
+  # the top of the Drive folder holds only README.md, train.parquet, test.parquet and extra/ (team decision 14 Nov)
+  other=$(rclone lsf "$REMOTE" | grep -v -x -e 'README.md' -e 'train.parquet' -e 'test.parquet' -e 'extra/' || true)
+  [ -z "$other" ] || { echo "Drive top level has other entries; move them to extra/old_versions/ first:"; echo "$other"; exit 1; }
+  ex=(); [ "${SHARE_TEST:-0}" = 1 ] || ex=(--exclude "/test.parquet" --exclude "/extra/test_full.parquet")
   rclone copy data_processed/model "$REMOTE" "${ex[@]}" --checksum --retries 5 --stats-one-line --stats 0 -v
   rclone check data_processed/model "$REMOTE" "${ex[@]}" --one-way
+  # files on Drive that this build does not make (old versions live in extra/old_versions/ on purpose)
+  comm -13 <(cd data_processed/model && find . -type f | sed 's|^\./||' | sort) \
+           <(rclone lsf -R --files-only "$REMOTE" | grep -v '^extra/old_versions/' | sort) \
+    | grep -v -x -e 'test.parquet' -e 'extra/test_full.parquet' | sed 's/^/WARN: on Drive but not in this build: /' || true
 fi
 echo "== $(date '+%F %T') OK"

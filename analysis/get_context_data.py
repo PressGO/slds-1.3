@@ -161,12 +161,13 @@ def update_rainfall(proj: Path, start: date, end: date, headers: dict[str, str],
     """Download missing days, rebuild the tidy tables. Returns the number of days that failed."""
     raw_dir = proj / "data_raw" / "nea_rainfall"
     failed = 0
-    today = datetime.now(SGT).date()
+    # a day is downloaded only 2 h after it ends, so its last readings are posted (a file is never downloaded again)
+    finished_before = (datetime.now(SGT) - timedelta(hours=2)).date()
     d = start
     while d <= end:
         path = raw_dir / f"rain_{d:%Y%m%d}.jsonl.gz"
-        if d >= today:
-            print(f"rainfall {d}: skipped (day not finished)")
+        if d >= finished_before:
+            print(f"rainfall {d}: skipped (day not finished, or ended less than 2 h ago)")
         elif path.exists():
             print(f"rainfall {d}: already downloaded")
         else:
