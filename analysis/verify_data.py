@@ -27,10 +27,12 @@ WHAT IT CHECKS
   6. Whole-table checks: (a) train.parquet = the use rows on population days of full_table (rules 4a, 20), value
      for value, without f_sat, f_sun, f_holiday; held-out roads drawn as rule 2a says; (b) the links of
      full_table = the RoadCategory-1 links; (c) extra/norm.parquet for 50 sampled links and
-     extra/connector_norm.parquet for their joining roads; (d) split and day type of every row, and every link
-     x 5-min time 06:00-21:55 on every day; (e) rain totals never below 0, never in (0, 0.1) and always whole
-     tenths (full_table and train_lodo); the table holds exactly the finished days (rule 18); train_lodo holds
-     only train days; data_settings.py holds the same numbers as the rules (compared only, never used).
+     extra/connector_norm.parquet for their joining roads; (d) split, day type and in_population of every row,
+     and every link x 5-min time 06:00-21:55 on every day; (e) rain totals never below 0, never in (0, 0.1)
+     and always whole tenths (full_table and train_lodo); (g) road and heldout_road of every row of the full
+     tables, train.parquet and train_lodo (rules 2a, 20); the table holds exactly the finished days (rule 18);
+     train_lodo holds only train days; data_settings.py holds the same numbers as the rules (compared only,
+     never used).
 
 HOW TO RUN (it only reads; it writes nothing)
   cd /home/dev/slds-1.3 && systemd-run --user --scope -q -p MemoryMax=8G -p MemorySwapMax=1G \
@@ -931,15 +933,17 @@ def check_norm_cells(rules, store, link_ids, path, name):
 
 
 def check_grid_and_days(expressway, days):
-    """(d) split and day type of every row as its date implies; every link x 5-min time 06:00-21:55
-    on every day covered (2,598 x 192 rows a day), no duplicates, and t on the date of the row."""
+    """(d) split, day type and in_population of every row as its date implies; every link x 5-min time
+    06:00-21:55 on every day covered (2,598 x 192 rows a day), no duplicates, and t on the date of the row."""
     lf = full_scan()
     examples, bad = [], 0
-    combos = lf.group_by("date", "daytype", "split").agg(pl.len().alias("rows")).collect(engine="streaming")
-    for d, dt, sp, n in combos.iter_rows():
-        if dt != daytype(d) or sp != split_of(d):
+    combos = (lf.group_by("date", "daytype", "split", "in_population").agg(pl.len().alias("rows"))
+              .collect(engine="streaming"))
+    for d, dt, sp, pop, n in combos.iter_rows():
+        if dt != daytype(d) or sp != split_of(d) or pop != in_population(d):     # rules 3, 4, 4a
             bad += n
-            examples.append(f"{d}: table {dt}/{sp}, rules {daytype(d)}/{split_of(d)} ({n:,} rows)")
+            examples.append(f"{d}: table {dt}/{sp}/{pop}, rules {daytype(d)}/{split_of(d)}/{in_population(d)} "
+                            f"({n:,} rows)")
     wrong_date = lf.select((pl.col("t").dt.date() != pl.col("date")).sum()).collect(engine="streaming").item()
     bad += wrong_date
     if wrong_date:
@@ -969,9 +973,23 @@ def check_grid_and_days(expressway, days):
         bad += 1
     # with the right row count per day, only valid times, only the 2,598 links and no duplicates,
     # every link x time is present (counting argument)
-    return Check("(d) split, day type, every link x 06:00-21:55 time", n_rows, bad,
+    return Check("(d) split, day type, in_population, every link x 06:00-21:55 time", n_rows, bad,
                  f"{len(days)} days x {expected_per_day:,} rows = {len(days) * expected_per_day:,}; "
                  f"table {n_rows:,} rows, {n_keys:,} distinct (LinkID, t)", examples[:3])
+
+
+def check_road_flags(lf, name, road_of, held_links):
+    """(g) road and heldout_road of every row as the raw registry and the draw of rule 2a imply (rules 2a, 20)."""
+    combos = lf.group_by("LinkID", "road", "heldout_road").agg(pl.len().alias("rows")).collect(engine="streaming")
+    bad, examples = 0, []
+    for lid, road, held, n in combos.iter_rows():
+        if road != road_of.get(lid) or held != (lid in held_links):
+            bad += n
+            examples.append(f"{lid}: table {road}/{held}, rules {road_of.get(lid)}/{lid in held_links} ({n:,} rows)")
+    n_held = combos.filter(pl.col("heldout_road").fill_null(False))["LinkID"].n_unique()
+    return Check(f"(g) {name}: road and heldout_road of every row", int(combos["rows"].sum()), bad,
+                 f"{combos['LinkID'].n_unique():,} links, {n_held:,} of them held out (rules: {len(held_links):,})",
+                 examples[:3])
 
 
 def check_rain_totals(paths):
@@ -1449,6 +1467,11 @@ def main():
         checks.append(check_use_rows(TEST, TEST_FULL))
     checks.append(check_link_set(expressway))
     checks.append(check_grid_and_days(expressway, all_days))
+    road_of = {lid: ROAD_GROUPS.get(links[lid].name, links[lid].name) for lid in expressway}   # rule 20
+    held_links = {lid for lid in expressway if road_of[lid] in heldout}                      # rule 2a
+    for lf, name in ((full_scan(), "full tables"), (pl.scan_parquet(TRAIN), "train.parquet"),
+                     (pl.scan_parquet(LODO), "train_lodo.parquet")):
+        checks.append(check_road_flags(lf, name, road_of, held_links))
     checks.append(check_rain_totals(full_files() + [LODO]))
     # rule 18: day D is finished when the rainfall table has its 23:55 readings and it is D+1 02:00
     now = datetime.now()

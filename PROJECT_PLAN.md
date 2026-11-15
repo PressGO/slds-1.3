@@ -390,7 +390,7 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
    - Before submission, a member who didn't write the pipeline reruns everything from a clean clone [Brief §6.2 p.4].
 9. **Write as we go.** Start the 8-section `report.qmd` skeleton now. Each workstream drafts its section as soon as its work is done. Update the data dictionary whenever a variable is added.
 10. **Grading records.** Update `CONTRIBUTIONS.md` weekly and `AI_USE.md` after every AI session [Brief §5 p.3, §6.3 p.4].
-11. **Schema and endpoint changes.** Endpoints are set at the top of `lta_collector.py`. The build's 107 checks (`analysis/build_data.py`, listed in `extra/build_info.json`) stop it if LTA changes the feed: for example if the 2,598 expressway links change, or more than 0.1% of rows have no update time or a band outside 1–8.
+11. **Schema and endpoint changes.** Endpoints are set at the top of `lta_collector.py`. The build's checks (`analysis/build_data.py`; 114 in data version 4, each listed in `extra/build_info.json`) stop it if LTA changes the feed: for example if the 2,598 expressway links change, or more than 0.1% of rows have no update time or a band outside 1–8.
 12. **Key hygiene.** Keys live only in `.Renviron` (or a Windows user variable). Never commit them, and never paste them into chats or AI tools; LTA's terms require keeping credentials confidential.
 
 ### 6.2 Scope ladder: what to cut if time runs out
