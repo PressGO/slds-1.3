@@ -1,4 +1,4 @@
-"""data_settings.py - every setting of the data pipeline (data version 3), in one place.
+"""data_settings.py - every setting of the data pipeline (data version 4), in one place.
 
 Each value is a decision. Change one only after a dated entry in DECISIONS.md (and CHANGELOG.md on the
 Linux PC), then raise DATA_VERSION and add a line to DATA_CHANGES. Used by build_data.py, data_steps.py and
@@ -9,8 +9,22 @@ from datetime import date
 
 # ---- data version: raise it when a rule, setting or bug fix changes what the tables mean ----
 # (not when new days are only added). Teammates compare it with their copy (README.md, build_info.json).
-DATA_VERSION = "3"
+DATA_VERSION = "4"
 DATA_CHANGES = [  # newest first; a list = one bullet each in README.md
+    ("4", "2026-11-14", [
+        "Back to the approved proposal. The main files (train.parquet, test.parquet) hold weekdays only: "
+        "Monday to Friday, no public holidays. Weekend and holiday rows are only in extra/full_table.parquet "
+        "(in_population = FALSE).",
+        "Splits as in the proposal: train 16 Oct - 6 Nov (the proposal says 13 Oct; our data starts 16 Oct), "
+        "validate 7 - 13 Nov, test 14 - 20 Nov. For weekday rows the normal level, labels and inputs are the "
+        "same as in v3.",
+        "Held-out roads again: AYE and CTE (column heldout_road; the same seeded draw as v1 and v2). Never fit, "
+        "tune or calibrate on them; score them in the test week.",
+        "Rain: station S35 now has readings in at least 80% of the slots on every training day, so 73 links "
+        "(PIE, AYE) take their rain from it.",
+        "f_sat, f_sun and f_holiday are not in the main files (always 0 there); extra/full_table.parquet "
+        "still has them.",
+    ]),
     ("3", "2026-11-14", [
         "New program, built straight from the raw files: build_data.py replaces 04_process.ipynb and "
         "build_model_data.py.",
@@ -46,16 +60,22 @@ EXPECTED_EXPRESSWAY_LINKS = 2598        # [L] in DECISIONS.md; the build stops i
 PRESENCE_DAYS = (date(2026, 10, 19), date(2026, 10, 23))   # first full week of collection
 PRESENCE_MIN = 0.90                     # keep links with a band at >= 90% of the updates captured then
 ROAD_GROUPS = {"KALLANG PAYA LEBAR EXPRESSWAY TUNNEL": "KALLANG PAYA LEBAR EXPRESSWAY"}
+HELDOUT_N, HELDOUT_SEED = 2, 20261113  # transfer check: whole roads, drawn once with this seed (as in v1-v2)
+NEVER_HELD_OUT = ("ALJUNIED WEST FLYOVER", "KALLANG BAHRU FLYOVER")   # 5-6 links each, not expressways
+EXPECTED_HELDOUT = ("AYER RAJAH EXPRESSWAY", "CENTRAL EXPRESSWAY")  # the draw; the build stops if it differs
 NEIGHBOUR_TOL_M = 5                     # B is downstream of A when B starts within 5 m of where A ends
 CONNECTOR_TOL_M = 5                     # a road joins an expressway link within 5 m (end -> start, end -> start)
 
-# ---- rows (DECISIONS.md 14 Nov) ----
-HOUR_FROM, HOUR_TO = 6, 22              # rows: 06:00 <= t < 22:00 (192 updates a day), every day
-SPLITS = {                              # by the date of t
-    "train": (date(2026, 10, 16), date(2026, 11, 8)),
-    "validate": (date(2026, 11, 9), date(2026, 11, 15)),
-    "test": (date(2026, 11, 16), date(2026, 11, 22)),
+# ---- rows (DECISIONS.md 14 Nov: back to the proposal) ----
+HOUR_FROM, HOUR_TO = 6, 22              # rows: 06:00 <= t < 22:00 (192 updates a day), every day in full_table
+SPLITS = {                              # by the date of t; the proposal's dates (its train starts 13 Oct,
+    "train": (date(2026, 10, 16), date(2026, 11, 6)),       # but our data starts 16 Oct)
+    "validate": (date(2026, 11, 7), date(2026, 11, 13)),
+    "test": (date(2026, 11, 14), date(2026, 11, 20)),
 }
+POPULATION_DAYTYPES = ("weekday",)      # the proposal's days: Mon-Fri, no public holidays (in_population);
+                                        # the main files hold only these, extra/full_table.parquet every day
+NOT_IN_MAIN_FILES = ("f_sat", "f_sun", "f_holiday")   # always 0 on population days
 NORM_SPLIT = "train"                    # the normal level is built from these days only, then frozen
 DAYTYPES = ("weekday", "saturday", "sunday_or_holiday")   # Mon-Fri / Sat / Sun or public holiday
 

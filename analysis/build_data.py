@@ -1,4 +1,4 @@
-"""build_data.py - SLDS 42.510 project 1.3: raw LTA files -> model tables (data version 3).
+"""build_data.py - SLDS 42.510 project 1.3: raw LTA files -> model tables (data version 4).
 
     .venv/bin/python analysis/build_data.py          (./build_processed.sh runs this, checks it and uploads)
 
@@ -12,8 +12,9 @@ its rainfall is downloaded), so rerunning on the same day gives the same files.
 Writes
   data_processed/model/      the copy on Google Drive (SLDS_1.3_processed):
       README.md              what every column means, rules, quick start (written by this script)
-      train.parquet          usable rows of the train and validate days (column split), model columns only
-      test.parquet           usable rows of the test days (once they exist; on Drive only after the freeze)
+      train.parquet          usable rows of the train and validate days (column split), model columns only, only
+                             the proposal's days (Mon-Fri, no public holiday); held-out roads flagged (heldout_road)
+      test.parquet           the same for the test days (once they exist; on Drive only after the freeze)
       extra/                 everything else (see README.md)
   data_processed/clean/      link registry and the cleaned speed-band panel (all hours), local only
   docs/model_data/           README.md, build_info.json, days.csv, SHA256SUMS.txt (versioned in git)
@@ -153,7 +154,8 @@ def row_problems(rows: pl.DataFrame, pairs: pl.DataFrame, holidays: set[date], c
         return rows.lazy().filter(*conds).select(pl.len()).collect().item()
 
     out = [("one row per link and time", int(rows.select(pl.struct("LinkID", "t").is_duplicated().sum()).item()), ""),
-           ("every row has its split, day type and road", n_bad(pl.any_horizontal(pl.col("split", "daytype", "road").is_null())), ""),
+           ("every row has its split, day type, road and both flags",
+            n_bad(pl.any_horizontal(pl.col("split", "daytype", "road", "in_population", "heldout_road").is_null())), ""),
            ("use rows: no input, y or U missing",
             n_bad(use, pl.any_horizontal([pl.col(c).is_null() for c in core + extra_in + ["y", "U"]])), ""),
            ("use rows: band captured now, and f_d0 is the real drop now (never reused)",
@@ -204,6 +206,10 @@ def row_problems(rows: pl.DataFrame, pairs: pl.DataFrame, holidays: set[date], c
             ("f_holiday matches the public-holiday list",
              n_bad(pl.col("f_holiday") != pl.col("date").is_in(sorted(holidays)).cast(pl.Int8)), ""),
             ("day type matches weekday and holiday", n_bad(pl.col("daytype").cast(pl.Utf8) != expect_day), ""),
+            ("in_population = Monday to Friday and not a public holiday",
+             n_bad(pl.col("in_population") != ((pl.col("weekday") <= 5) & ~pl.col("is_holiday"))), ""),
+            ("heldout_road = the road is one of the held-out roads (AYE, CTE)",
+             n_bad(pl.col("heldout_road") != pl.col("road").cast(pl.Utf8).is_in(list(S.EXPECTED_HELDOUT))), ""),
             ("f_slot15 is 24-87 (06:00-22:00)", n_bad(~pl.col("f_slot15").is_between(24, 87)), ""),
             ("rain totals are 0 or whole tenths of a mm (no leftovers below 0.1 mm, never below 0)",
              n_bad(pl.any_horizontal(exact)), ""),
@@ -215,8 +221,9 @@ def row_problems(rows: pl.DataFrame, pairs: pl.DataFrame, holidays: set[date], c
 
 
 def label_summary(r: pl.DataFrame) -> dict:
-    """Shares of U and y on usable rows, overall and on the rows that are normal now (the scoring rows)."""
-    r = r.lazy().filter(pl.col("use")).select("date", "U", "y").collect()
+    """Shares of U and y on the rows of the main files (usable, population days), overall and on the rows that
+    are normal now (the scoring rows)."""
+    r = r.lazy().filter(pl.col("use") & pl.col("in_population")).select("date", "U", "y").collect()
     onset = r.filter(~pl.col("U"))
     return {"days": r["date"].n_unique(), "use_rows": r.height, "share_U": round(r["U"].mean(), 4),
             "share_y": round(r["y"].mean(), 4), "onset_rows": onset.height,
@@ -392,6 +399,11 @@ def main() -> None:
     check("population: every expressway link kept (presence >= 90%)", len(pop_ids) == S.EXPECTED_EXPRESSWAY_LINKS,
           f"{len(pop_ids)}; presence {links['presence_week1'].min():.3f}-{links['presence_week1'].max():.3f} "
           f"of {n_week_updates} updates")
+    held = D.heldout_roads(pop["road"].unique().to_list())
+    links = links.with_columns((pl.col("in_population") & pl.col("road").is_in(held)).alias("heldout_road"))
+    n_held = links.filter("heldout_road").height
+    check("held-out roads: the seeded draw gives AYE and CTE, as in data versions 1-2",
+          tuple(held) == S.EXPECTED_HELDOUT, f"{held}, {n_held} links")
     pairs = D.neighbour_pairs(pop)
     check("neighbours: every gap <= tolerance", pairs.filter(pl.col("gap_m") > S.NEIGHBOUR_TOL_M).height == 0)
     check("neighbours: no link is its own neighbour", pairs.filter(pl.col("LinkID") == pl.col("downstream")).height == 0)
@@ -480,8 +492,9 @@ def main() -> None:
     rain_now = rain.filter(pl.col("station_id").is_in(used)).rename({"rain_mm": "rain_now"})
     e_station = pl.Enum(used)
     wd = window_days.select("date", "weekday", "is_holiday", pl.col("daytype").cast(pl.Enum(list(S.DAYTYPES))),
-                            pl.col("split").cast(pl.Enum(list(S.SPLITS))))
-    road = links.select("LinkID", pl.col("road").cast(pl.Enum(sorted(links["road"].unique().to_list()))))
+                            pl.col("split").cast(pl.Enum(list(S.SPLITS))), "in_population")
+    road = links.select("LinkID", pl.col("road").cast(pl.Enum(sorted(links["road"].unique().to_list()))),
+                        "heldout_road")
     school = cal.select(pl.col("date").cast(pl.Date),
                         pl.col("school_period").cast(pl.Enum(sorted(cal["school_period"].drop_nulls().unique().to_list()))))
     parts: dict[str, list] = {sp: [] for sp in S.SPLITS}
@@ -521,12 +534,12 @@ def main() -> None:
 
     # ---- 9. write the main tables (rows in order: split, link, time) ----
     log("9. writing the main tables")
-    core, extra_in = D.core_input_columns(), D.connector_input_columns()
-    main_cols = ["LinkID", "road", "t", "date", "daytype", "split", "y", "U"] + core + extra_in
+    core, extra_in, model_in = D.core_input_columns(), D.connector_input_columns(), D.model_input_columns()
+    main_cols = ["LinkID", "road", "heldout_road", "t", "date", "daytype", "split", "y", "U"] + model_in + extra_in
     info = {"band": "info_band", "norm_band": "info_norm_band", "deficit": "info_deficit", "low": "info_low",
             "rain_now": "info_rain_mm", "station_id": "info_station_id", "station_km": "info_station_km",
             "school_period": "info_school_period", "retrieved": "info_retrieved"}
-    full_cols = (["LinkID", "road", "t", "date", "daytype", "split", "use", "y",
+    full_cols = (["LinkID", "road", "heldout_road", "t", "date", "daytype", "split", "in_population", "use", "y",
                   *[f"y_h{h}" for h in S.EXTRA_HORIZONS], "U"] + core + extra_in
                  + [pl.col(a).alias(b) for a, b in info.items()])
 
@@ -537,20 +550,22 @@ def main() -> None:
 
     n: dict = {}
     use = pl.col("use")
+    keep = use & pl.col("in_population")         # the main files: usable rows of the proposal's days
     tv = pl.concat([by_split[sp] for sp in ("train", "validate") if sp in by_split], rechunk=False)
     table(tv, None, full_cols).sink_parquet(TMP_OUT / "extra" / "full_table.parquet")
-    table(tv, use, main_cols).sink_parquet(TMP_OUT / "train.parquet")
+    table(tv, keep, main_cols).sink_parquet(TMP_OUT / "train.parquet")
     n["extra/full_table.parquet"] = tv.height
     n["train.parquet"] = {sp: summary[sp]["use_rows"] for sp in summary}
-    sample_ids = sorted(random.Random(S.SAMPLE_SEED).sample(pop_ids, S.SAMPLE_LINKS))
-    smp = table(tv, use & pl.col("LinkID").is_in(sample_ids), main_cols).collect()
+    free_ids = sorted(links.filter(pl.col("in_population") & ~pl.col("heldout_road"))["LinkID"].to_list())
+    sample_ids = sorted(random.Random(S.SAMPLE_SEED).sample(free_ids, S.SAMPLE_LINKS))
+    smp = table(tv, keep & pl.col("LinkID").is_in(sample_ids), main_cols).collect()
     smp.write_parquet(TMP_OUT / "extra" / "train_sample.parquet")
     n["extra/train_sample.parquet"] = smp.height
     del smp
     if "test" in by_split:
-        table(by_split["test"], use, main_cols).sink_parquet(TMP_OUT / "test.parquet")
+        table(by_split["test"], keep, main_cols).sink_parquet(TMP_OUT / "test.parquet")
         table(by_split["test"], None, full_cols).sink_parquet(TMP_OUT / "extra" / "test_full.parquet")
-        n["test.parquet"] = by_split["test"].lazy().filter(use).select(pl.len()).collect().item()
+        n["test.parquet"] = by_split["test"].lazy().filter(keep).select(pl.len()).collect().item()
         n["extra/test_full.parquet"] = by_split["test"].height
     rdays = (rows.lazy().group_by("date")
                  .agg(pl.len().alias("rows"), pl.col("band").is_not_null().mean().alias("share_captured"),
@@ -562,6 +577,12 @@ def main() -> None:
         lf = pl.scan_parquet(TMP_OUT / f)
         check(f"written: {f} holds every row once", lf.select(pl.len()).collect().item() == expect
               and not lf.select(pl.struct("LinkID", "t").is_duplicated().any()).collect().item(), f"{expect:,} rows")
+    tdays = set(pl.scan_parquet(TMP_OUT / "train.parquet").select(pl.col("date").unique()).collect()["date"].to_list())
+    want = set(days.filter(pl.col("in_population") & pl.col("split").is_in(["train", "validate"]))["date"].to_list())
+    check("written: train.parquet holds exactly the proposal's days (Mon-Fri, no public holiday) of train and validate",
+          tdays == want, f"{len(tdays)} days; only in file {sorted(tdays - want)}, missing {sorted(want - tdays)}")
+    check("written: train.parquet has none of " + ", ".join(S.NOT_IN_MAIN_FILES),
+          not set(S.NOT_IN_MAIN_FILES) & set(pl.read_parquet_schema(TMP_OUT / "train.parquet")))
     links.write_parquet(TMP_OUT / "extra" / "links.parquet")
     pairs.write_parquet(TMP_OUT / "extra" / "neighbours.parquet")
     conn.write_parquet(TMP_OUT / "extra" / "connectors.parquet")
@@ -571,16 +592,17 @@ def main() -> None:
     n["extra/incidents.parquet"] = incidents.height
 
     # ---- 10. the train days again, each with a normal level built without that day ----
-    # PROJECT_PLAN §4.7 sensitivity check: in train.parquet a train day is part of its own normal level (a quarter
-    # of it for a Saturday or Sunday), which makes its labels a little easier. Same columns as train.parquet.
+    # PROJECT_PLAN §4.9 sensitivity check: in train.parquet a train day is part of its own normal level (1 of the
+    # 16 weekdays), which makes its labels a little easier. Same columns and days as the train rows of train.parquet.
     log("10. leave-own-day-out version of the train days")
+    lodo_days = days.filter((pl.col("split") == "train") & pl.col("in_population"))["date"].to_list()
     lodo_dir = TMP_OUT / "lodo_parts"
     lodo_dir.mkdir()
     bad_total = {}
     excl_bad, lodo_sum = 0, []
     pxw = pxw.with_columns(pl.col("t").dt.date().alias("date"))
     pcn = pcn.with_columns(pl.col("t").dt.date().alias("date"))
-    for d in train_days:
+    for d in lodo_days:
         days_d = days.with_columns(pl.when(pl.col("date") == d).then(None).otherwise(pl.col("split")).alias("split"))
         norm_d, cnorm_d = D.normal_level(pxw.drop("date"), days_d), D.normal_level(pcn.drop("date"), days_d)
         dt = days.filter(pl.col("date") == d)["daytype"].item()
@@ -600,12 +622,12 @@ def main() -> None:
         r = D.assemble(b, pairs, D.lag_table(b), conn, cl, near, rin, rain_now, wd, road, school)
         for name, bad, _ in row_problems(r, pairs, holidays, conn, cl):
             bad_total[name] = bad_total.get(name, 0) + bad
-        lodo_sum.append(r.lazy().filter(use).select("date", "U", "y").collect())
-        table(r, use, main_cols).sink_parquet(lodo_dir / f"{d}.parquet")
+        lodo_sum.append(r.lazy().filter(keep).select("date", "U", "y").collect())
+        table(r, keep, main_cols).sink_parquet(lodo_dir / f"{d}.parquet")
         del b, cl, r
     check("lodo: each day's normal level leaves out exactly that day", excl_bad == 0, f"{excl_bad} cells differ")
     for name, bad in bad_total.items():
-        check(f"lodo rows: {name}", bad == 0, f"{len(train_days)} days" if bad == 0 else f"{bad:,} bad")
+        check(f"lodo rows: {name}", bad == 0, f"{len(lodo_days)} days" if bad == 0 else f"{bad:,} bad")
     pl.scan_parquet(sorted(lodo_dir.glob("*.parquet"))).sink_parquet(TMP_OUT / "extra" / "train_lodo.parquet")
     shutil.rmtree(lodo_dir)
     lodo = pl.concat(lodo_sum)
@@ -627,7 +649,7 @@ def main() -> None:
                                                          on="date", how="left")
                 .with_columns(pl.col("date").dt.strftime("%a").alias("day"),
                               pl.col("share_captured", "share_use", "share_rain_missing", "share_rain_readings").round(4))
-                .select("date", "day", "daytype", "is_holiday", "split", "updates", "updates_06_22", "rows",
+                .select("date", "day", "daytype", "is_holiday", "split", "in_population", "updates", "updates_06_22", "rows",
                         "share_captured", "use_rows", "share_use", "share_rain_missing", "share_rain_readings")
                 .sort("date"))
     dtab.write_csv(TMP_OUT / "extra" / "days.csv")
@@ -637,9 +659,12 @@ def main() -> None:
         "code_sha256": {f: sha256(PROJ / f) for f in CODE_FILES},
         "software": {"python": platform.python_version(), "polars": pl.__version__, "numpy": np.__version__},
         "days": {"first": str(first_day), "last_finished": str(cutoff),
-                 "by_split": {s: dtab.filter(pl.col("split") == s).height for s in S.SPLITS}},
+                 "by_split": {s: dtab.filter(pl.col("split") == s).height for s in S.SPLITS},
+                 "population_by_split": {s: dtab.filter((pl.col("split") == s) & pl.col("in_population")).height
+                                         for s in S.SPLITS}},
         "links": {"registry": registry.height, "expressway": len(xw_ids), "in_population": len(pop_ids),
                   "roads": links["road"].n_unique(), "presence_week1_updates": n_week_updates,
+                  "heldout_roads": held, "heldout_links": n_held,
                   "neighbour_pairs": pairs.height, "joining_roads": len(conn_ids), "joining_pairs": conn.height,
                   "expressway_links_with_joining_road": conn["joins"].n_unique(),
                   "rain_stations_eligible": len(good), "rain_stations_used": len(used)},
@@ -675,16 +700,14 @@ def readme(info: dict, days: pl.DataFrame) -> str:
     val = ls.get("validate", {})
     spans = []
     for s in S.SPLITS:
-        d = days.filter(pl.col("split") == s)
         a, b = S.SPLITS[s]
-        if d.height:
-            so_far = "" if d["date"].max() == b else f" (so far; to {b:%a %d %b})"
-            spans.append(f"| `{s}` | {d['date'].min():%a %d %b} to {d['date'].max():%a %d %b}{so_far} | {d.height} | "
-                         + {"train": "fit the models; the normal level comes from these days only",
-                            "validate": "tune settings, choose models, calibrate",
-                            "test": "final test, once, after the plan is frozen"}[s] + " |")
-        else:
-            spans.append(f"| `{s}` | {a:%a %d %b} to {b:%a %d %b} | 0 so far | not finished yet |")
+        d = days.filter((pl.col("split") == s) & pl.col("in_population"))
+        use_for = {"train": "fit and tune the models; the normal level comes from these days only",
+                   "validate": "choose the final model, calibrate, set the alert budget k",
+                   "test": "final test, once, after the plan is frozen"}[s]
+        all_d = days.filter(pl.col("split") == s)
+        so_far = "" if all_d.height and all_d["date"].max() == b else " (not finished yet)"
+        spans.append(f"| `{s}` | {a:%a %d %b} to {b:%a %d %b}{so_far} | {d.height} | {use_for} |")
     changes = []
     for v, d, text in S.DATA_CHANGES:
         if isinstance(text, list):
@@ -692,6 +715,8 @@ def readme(info: dict, days: pl.DataFrame) -> str:
         else:
             changes.append(f"- **v{v}** ({d}): {text}")
     lag_names = ", ".join(f"`f_d{m}`" for m in S.LAGS)
+    held = " and ".join(r.title() for r in lk["heldout_roads"])
+    gb = max(1, round(sum(tr.values()) * 420 / 1e9))
 
     def pct(x) -> str:
         return f"{100 * x:.1f}%" if x is not None else "-"
@@ -706,8 +731,8 @@ same version number. A change of rule raises the version (see "Changes" at the e
 
 | File | What it is |
 |---|---|
-| `train.parquet` | The rows to train on: {tr.get('train', 0):,} rows with `split = "train"` and {tr.get('validate', 0):,} with `split = "validate"`. Only usable rows, only the columns models need. |
-| `test.parquet` | The test week. Added after the test week ends and the plan is frozen. Do not open it before then. |
+| `train.parquet` | The rows to train on: {tr.get('train', 0):,} rows with `split = "train"` and {tr.get('validate', 0):,} with `split = "validate"`. Weekdays only (Monday to Friday, no public holidays), as in our proposal. Only usable rows, only the columns models need. |
+| `test.parquet` | The test week (Mon 16 to Fri 20 Nov). Added after the test week ends and the plan is frozen. Do not open it before then. |
 | `README.md` | This file. |
 | `extra/` | Everything else. You do not need it to train a model. |
 
@@ -715,27 +740,28 @@ In `extra/`:
 
 | File | What it is |
 |---|---|
-| `train_sample.parquet` | The `train.parquet` rows of {S.SAMPLE_LINKS} links ({n.get('extra/train_sample.parquet', 0):,} rows). Use it to test your code fast. |
+| `train_sample.parquet` | The `train.parquet` rows of {S.SAMPLE_LINKS} links that are not on a held-out road ({n.get('extra/train_sample.parquet', 0):,} rows). Use it to test your code fast. |
 | `train_lodo.parquet` | The `train` days again, but each day's normal level is built without that day. Same columns as `train.parquet`. For the plan's leave-own-day-out check (see "Good to know"). |
-| `full_table.parquet` | Every row of the train and validate days, also the ones we cannot use (`use` = FALSE), with `y_h5`, `y_h10`, `y_h30` (the answer 5, 10, 30 minutes ahead) and `info_` columns for exploring the data. |
+| `full_table.parquet` | Every row of the train and validate days, for exploring: every day of the week (`in_population` = FALSE on Saturdays, Sundays and public holidays), also the rows we cannot use (`use` = FALSE), with `y_h5`, `y_h10`, `y_h30` (the answer 5, 10, 30 minutes ahead), `f_sat`, `f_sun`, `f_holiday` and `info_` columns. |
 | `test_full.parquet` | The same for the test week (later). |
-| `links.parquet` | One row per link: road, coordinates, rain station, number of neighbours and joining roads. |
+| `links.parquet` | One row per link: road, held-out road or not, coordinates, rain station, number of neighbours and joining roads. |
 | `neighbours.parquet`, `connectors.parquet` | Which link follows which; which roads join which link. |
 | `norm.parquet`, `connector_norm.parquet` | The normal levels (`n_obs` = how many bands each median uses). |
-| `days.csv` | One row per day: updates captured, usable rows, rain coverage. Low days: see "Good to know". |
+| `days.csv` | One row per day: in the proposal's days or not, updates captured, usable rows, rain coverage. |
 | `incidents.parquet` | LTA incident messages (accidents, breakdowns), for checking errors. Not an input. |
 | `build_info.json`, `SHA256SUMS.txt` | How the files were built (every check and its result) and their checksums. |
 
 ## Quick start (R)
 
-`train.parquet` has {sum(tr.values()):,} rows and needs about 5 GB of memory in R. Start with
-`extra/train_sample.parquet`. For the full data, read only the rows and columns you need:
+`train.parquet` has {sum(tr.values()):,} rows and needs about {gb} GB of memory in R. Start with
+`extra/train_sample.parquet`. For the full data, read only the columns you need.
 
 ```r
 library(arrow); library(dplyr)
-d   <- read_parquet("extra/train_sample.parquet")   # later: open_dataset("train.parquet") |> filter(...) |> collect()
-fit <- d |> filter(split == "train")       # fit models on these rows
-val <- d |> filter(split == "validate")    # tune and compare on these rows
+d   <- read_parquet("extra/train_sample.parquet")   # later: read_parquet("train.parquet")
+d   <- d |> filter(!heldout_road)          # AYE and CTE: only for the transfer check in the test week
+fit <- d |> filter(split == "train")       # fit and tune the models on these rows
+val <- d |> filter(split == "validate")    # choose the final model and calibrate on these rows
 x   <- fit |> select(starts_with("f_"))                            # all inputs, no missing values
 x0  <- fit |> select(starts_with("f_"), -starts_with("f_conn_"))   # the same without the joining roads
 y   <- fit$y                               # TRUE = unusual 15 minutes later
@@ -745,12 +771,23 @@ onset <- !fit$U                            # the main score uses these rows: nor
 ## One row
 
 One row is one link (about 140 m of road, one direction) at one LTA update `t` (every 5 minutes), from
-{st['HOUR_FROM']:02d}:00 to {st['HOUR_TO']:02d}:00, every day. There are {lk['in_population']:,} links: the 10 expressways, plus 2 short
-flyovers (Aljunied West, Kallang Bahru) that LTA also lists as expressway. Column `road` has {lk['roads']} values.
+{st['HOUR_FROM']:02d}:00 to {st['HOUR_TO']:02d}:00, Monday to Friday except public holidays (our proposal's days). There are
+{lk['in_population']:,} links: the 10 expressways, plus 2 short flyovers (Aljunied West, Kallang Bahru) that LTA also lists as
+expressway. Column `road` has {lk['roads']} values.
 
-| Split | Days | Number of days | Use |
+| Split | Dates | Weekdays used | Use |
 |---|---|---|---|
 {chr(10).join(spans)}
+
+Our proposal's training period starts on Tue 13 Oct, but our data starts on Fri 16 Oct (collection from 11:10
+that day). Mon 9 Nov (the Deepavali holiday) is not used.
+
+## Held-out roads (transfer check)
+
+`heldout_road` = TRUE for the {lk['heldout_links']:,} links of the {held}. They were drawn at random with
+a fixed seed before any model was fitted (the same draw as data versions 1 and 2). Never use their rows to fit,
+tune, choose or calibrate a model. In the test week, score them on their own: does a model trained on the other
+roads work on roads it has never seen?
 
 ## What we predict
 
@@ -762,7 +799,9 @@ y:                                                      |         low    low
 ```
 
 - **Normal level** (`extra/norm.parquet`): the median speed band of the link for that 15-minute slot and day
-  type (`weekday` Mon-Fri, `saturday`, `sunday_or_holiday`), from the `train` days only. It never changes after that.
+  type, from the `train` days only. It never changes after that. The main files hold weekdays only, so they use
+  the `weekday` level (Monday to Friday). The `saturday` and `sunday_or_holiday` levels are only for the extra
+  rows in `extra/full_table.parquet`.
 - **Drop** = normal level minus the speed band. A drop of 2 means 2 bands (20 km/h) slower than normal. It goes
   from -7 to 7, can end in .5, and is below 0 when traffic is faster than normal.
 - **Low** = a drop of {st['THRESHOLD']} or more.
@@ -785,8 +824,7 @@ y:                                                      |         low    low
 | `f_rain15`, `f_rain30` | rain (mm) at the nearest station in the 15 / 30 minutes up to 5 minutes ago (0 = no rain) |
 | `f_rain15_missing`, `f_rain30_missing` | 1 = the station had no reading at all in that time (the value is then 0) |
 | `f_slot15` | time of day in 15-minute slots: 24 = 06:00-06:14, ..., 87 = 21:45-21:59 |
-| `f_mon` ... `f_sun` | day of the week, one-hot (exactly one is 1) |
-| `f_holiday` | 1 = public holiday (Sun 8 Nov and Mon 9 Nov, Deepavali; none in the test week) |
+| `f_mon` ... `f_fri` | day of the week, one-hot (exactly one is 1) |
 | `f_conn_in_d0` ... `f_conn_in_d30` | the biggest drop among the roads leading into the link (slip roads, main roads), against their own normal level |
 | `f_conn_out_d0` ... `f_conn_out_d30` | the same for the roads leading out of it |
 | `f_conn_in_none`, `f_conn_out_none` | 1 = no such road (values then 0) |
@@ -794,14 +832,16 @@ y:                                                      |         low    low
 
 The `f_conn_` inputs are extra: train every model with and without them (`x` and `x0` above), on the same rows.
 
-Other columns: `LinkID`, `road`, `t` (Singapore time), `date`, `daytype`, `split`, `y`, `U`. Rows are in the
-order split, link, time.
+Other columns: `LinkID`, `road`, `heldout_road`, `t` (Singapore time), `date`, `daytype` (always `weekday`
+here), `split`, `y`, `U`. Rows are in the order split, link, time.
 
 ## Rules
 
-- Use only the `f_` columns as inputs. Never use `y`, `U`, `split` or anything from `extra/` as an input.
-- Fit on `split == "train"`. Use `split == "validate"` to tune, choose and calibrate. Do not open `test.parquet`
-  before the plan is frozen.
+- Use only the `f_` columns as inputs. Never use `y`, `U`, `split`, `heldout_road` or anything from `extra/` as an input.
+- Never fit, tune, choose or calibrate on rows with `heldout_road == TRUE`.
+- Fit on `split == "train"`. Tune by forward-chaining inside the train days: fit on earlier days, check on
+  later days, never the other way round. Use `split == "validate"` to choose the final model, calibrate and set
+  the alert budget *k*. Do not open `test.parquet` before the plan is frozen.
 - Do not take "the row above" as the previous update. Use `f_d5`, `f_d10`, ...
 - Set a random seed. For `glmnet`, treat `f_slot15` as a curve or as hour groups, not a straight line. For
   `ranger` on all rows, you may use fewer FALSE rows (fixed seed) and then calibrate on `validate`.
@@ -811,10 +851,10 @@ order split, link, time.
 
 - A neighbour's or joining road's value can also be a reused one (at most 5 minutes old), like `f_d5` ... `f_d30`.
 - A rain total skips missing readings; the `_missing` flag is 1 only when all readings in the window are missing.
-- In `train.parquet`, a train day is part of its own normal level (for a Saturday or Sunday, a quarter of it), so
-  its labels are a little easier than on new days. `extra/train_lodo.parquet` has the same days with a normal
-  level built without that day: share of `U` {pct(ls['train']['share_U'])} in `train`, {pct(ls['train_lodo']['share_U'])} in `train_lodo`,
-  {pct(val.get('share_U'))} in `validate`. Fit a model on both and compare the validation scores (PROJECT_PLAN §4.7).
+- In `train.parquet`, a train day is one of the days its own normal level is built from, so its labels are a
+  little easier than on new days. `extra/train_lodo.parquet` has the same days with a normal level built without
+  that day: share of `U` {pct(ls['train']['share_U'])} in `train`, {pct(ls['train_lodo']['share_U'])} in `train_lodo`, {pct(val.get('share_U'))} in `validate`.
+  Fit a model on both and compare the validation scores (PROJECT_PLAN §4.9).
 - Our data arrives a median of 4 minutes after `t`. A warning 15 minutes ahead of `t` gives about 11 minutes in practice.
 - Days with fewer usable rows (see `extra/days.csv`): Fri 16 Oct (collection started 11:10) and Thu 12 Nov (our
   second collector was down from 10:12 to 14 Nov 17:15).

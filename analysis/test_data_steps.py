@@ -55,17 +55,20 @@ class TimeTests(unittest.TestCase):
 
 class DayTests(unittest.TestCase):
     def test_day_table(self):
+        # the proposal's splits: train to Fri 6 Nov, validate Sat 7 - Fri 13 Nov, test Sat 14 - Fri 20 Nov
         d = D.day_table(date(2026, 11, 6), date(2026, 11, 23), {date(2026, 11, 8), date(2026, 11, 9)})
-        got = {r["date"]: (r["daytype"], r["split"]) for r in d.iter_rows(named=True)}
-        self.assertEqual(got[date(2026, 11, 6)], ("weekday", "train"))            # Friday
-        self.assertEqual(got[date(2026, 11, 7)], ("saturday", "train"))
-        self.assertEqual(got[date(2026, 11, 8)], ("sunday_or_holiday", "train"))  # Sunday and Deepavali
-        self.assertEqual(got[date(2026, 11, 9)], ("sunday_or_holiday", "validate"))  # Monday, holiday
-        self.assertEqual(got[date(2026, 11, 10)], ("weekday", "validate"))
-        self.assertEqual(got[date(2026, 11, 15)], ("sunday_or_holiday", "validate"))
-        self.assertEqual(got[date(2026, 11, 16)], ("weekday", "test"))
-        self.assertEqual(got[date(2026, 11, 22)], ("sunday_or_holiday", "test"))
-        self.assertEqual(got[date(2026, 11, 23)], ("weekday", None))
+        got = {r["date"]: (r["daytype"], r["split"], r["in_population"]) for r in d.iter_rows(named=True)}
+        self.assertEqual(got[date(2026, 11, 6)], ("weekday", "train", True))             # Friday
+        self.assertEqual(got[date(2026, 11, 7)], ("saturday", "validate", False))
+        self.assertEqual(got[date(2026, 11, 8)], ("sunday_or_holiday", "validate", False))  # Sunday, Deepavali
+        self.assertEqual(got[date(2026, 11, 9)], ("sunday_or_holiday", "validate", False))  # Monday, holiday
+        self.assertEqual(got[date(2026, 11, 10)], ("weekday", "validate", True))
+        self.assertEqual(got[date(2026, 11, 13)], ("weekday", "validate", True))         # Friday
+        self.assertEqual(got[date(2026, 11, 14)], ("saturday", "test", False))
+        self.assertEqual(got[date(2026, 11, 16)], ("weekday", "test", True))
+        self.assertEqual(got[date(2026, 11, 20)], ("weekday", "test", True))             # Friday, last test day
+        self.assertEqual(got[date(2026, 11, 21)], ("saturday", None, False))
+        self.assertEqual(got[date(2026, 11, 23)], ("weekday", None, True))
         self.assertEqual(d.filter(pl.col("date") == date(2026, 11, 9))["weekday"].item(), 1)
         self.assertTrue(d.filter(pl.col("date") == date(2026, 11, 9))["is_holiday"].item())
 
@@ -299,6 +302,19 @@ class InputTests(unittest.TestCase):
         self.assertTrue(all(c.startswith("f_") for c in core + extra))
         self.assertNotIn("f_prev_missing", core)
         self.assertEqual((len(core), len(extra)), (38, 18))
+        main = D.model_input_columns()                     # the main files: no f_sat, f_sun, f_holiday
+        self.assertEqual(main, [c for c in core if c not in ("f_sat", "f_sun", "f_holiday")])
+        self.assertEqual(len(main), 35)
+        self.assertIn("f_fri", main)
+
+    def test_heldout_roads(self):
+        roads = ["TAMPINES EXPRESSWAY", "AYER RAJAH EXPRESSWAY", "BUKIT TIMAH EXPRESSWAY", "CENTRAL EXPRESSWAY",
+                 "EAST COAST PARKWAY", "KALLANG PAYA LEBAR EXPRESSWAY", "KRANJI EXPRESSWAY", "SELETAR EXPRESSWAY",
+                 "MARINA COASTAL EXPRESSWAY", "PAN ISLAND EXPRESSWAY", "ALJUNIED WEST FLYOVER", "KALLANG BAHRU FLYOVER"]
+        # the draw of data versions 1-2: random.Random(20261113).sample(the 10 sorted expressways, 2)
+        self.assertEqual(D.heldout_roads(roads), ["AYER RAJAH EXPRESSWAY", "CENTRAL EXPRESSWAY"])
+        self.assertEqual(D.heldout_roads(list(reversed(roads)) + roads), D.heldout_roads(roads))   # order, repeats
+        self.assertEqual(tuple(D.heldout_roads(roads)), S.EXPECTED_HELDOUT)
 
 
 class IncidentTests(unittest.TestCase):

@@ -3,7 +3,7 @@
 42.510 Statistical Learning for Data Science (SUTD, 2026), catalog topic 1.3.
 Team: Aveline, Liam, Juan Peng, Ronnie
 
-Status, 16 Oct 2026: LTA traffic data collected 24/7 since 14 Oct 2026 (desktop until 16 Oct; since then two collectors with two keys on the Linux mini PC, see `DECISIONS.md`). Proposal due 17 Oct; no modelling until the proposal is approved (Brief §6.1).
+Status, 14 Nov 2026: the instructor has approved our proposal. LTA traffic data collected 24/7 since 14 Oct 2026 (desktop until 16 Oct; since then two collectors with two keys on the Linux mini PC, see `DECISIONS.md`). The model tables (data version 4: weekdays only, AYE and CTE held out, as in our proposal) are on Google Drive: see "Getting the modelling data".
 
 ## Files
 
@@ -18,7 +18,7 @@ Status, 16 Oct 2026: LTA traffic data collected 24/7 since 14 Oct 2026 (desktop 
 | `upload_raw.sh` | Nightly backup (cron, 02:30 SGT): downloads any missing rainfall day, packs each finished day into one `.tar` per collector, copies them with rainfall, calendar, fetch logs and `MANIFEST.csv` to the Google Drive folder `SLDS_1.3_raw` (one folder per source) with `rclone copy` (never deletes; an uploaded tar is never replaced), then `rclone check`. Log: `archive_raw/upload.log` | cron on the Linux PC; by hand: `./upload_raw.sh; tail archive_raw/upload.log` |
 | `analysis/archive_raw.py` | Stages `archive_raw/`, an exact copy of the Drive folder: daily tars from `data_raw/` and `data_raw_expressway/`, rainfall, calendar, fetch logs, `README.txt`, `MANIFEST.csv`, `SHA256SUMS.txt`. Only reads the raw folders; a packed day is never rebuilt | Called by `upload_raw.sh`; `--dry-run` to preview |
 | `analysis/verify_raw.py` | For teammates: checks downloaded files against `SHA256SUMS.txt` and puts them into the project | See "Getting the raw data" |
-| `analysis/build_data.py` | Raw files → model tables (data version 3; replaces `04_process.ipynb` and `build_model_data.py`, 14 Nov). Reads only `data_raw/`, `data_raw_expressway/` and the rainfall and calendar tables; rebuilds everything from scratch on every run (no cache), so the same raw files give the same tables. Checks every step and stops with `CHECK FAILED` if a check fails; every check and its result is listed in `extra/build_info.json`. Writes to temporary folders that are swapped in only at the end, so a failed build never leaves half-written files. Writes `data_processed/model/` (the Drive copy) and `docs/model_data/` | Via `build_processed.sh` |
+| `analysis/build_data.py` | Raw files → model tables (data version 4 since 14 Nov; replaces `04_process.ipynb` and `build_model_data.py`, 14 Nov). Reads only `data_raw/`, `data_raw_expressway/` and the rainfall and calendar tables; rebuilds everything from scratch on every run (no cache), so the same raw files give the same tables. Checks every step and stops with `CHECK FAILED` if a check fails; every check and its result is listed in `extra/build_info.json`. Writes to temporary folders that are swapped in only at the end, so a failed build never leaves half-written files. Writes `data_processed/model/` (the Drive copy) and `docs/model_data/` | Via `build_processed.sh` |
 | `analysis/data_settings.py` | Every setting of the data pipeline in one place (dates, splits, label rule, look-backs), each with the decision behind it. A change here is a decision: `DECISIONS.md` first | Read only |
 | `analysis/data_steps.py` | The steps of the pipeline as small functions (tables in, tables out): cleaning, registry, neighbours, joining roads, normal level, labels, inputs, incidents | Used by `build_data.py` |
 | `analysis/test_data_steps.py` | Tests every step on small made-up data with answers worked out by hand | `.venv/bin/python analysis/test_data_steps.py -v` |
@@ -83,7 +83,8 @@ The tables for the models are in the Google Drive folder `SLDS_1.3_processed` (V
 
 ```
 README.md        what every column means, the rules, R quick start (also in docs/model_data/README.md)
-train.parquet    the rows to train on; column split = "train" (fit) or "validate" (tune)
+train.parquet    the rows to train on (Mon-Fri, no public holidays); split = "train" (fit, tune) or "validate"
+                 (choose, calibrate); heldout_road = TRUE for AYE and CTE (only for the transfer check)
 test.parquet     the test week, added after it ends and the plan is frozen
 extra/           everything else: a small sample, the full table with info_ columns, links, neighbours,
                  joining roads, normal levels, days.csv, incidents, build_info.json, SHA256SUMS.txt

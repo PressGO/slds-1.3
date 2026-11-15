@@ -1,6 +1,6 @@
 # Project 1.3 plan: recurring vs unusual congestion
 
-42.510 Statistical Learning for Data Science · Team: [team name] · Version 2, Wed 14 Oct 2026 (v1: 13 Oct)
+42.510 Statistical Learning for Data Science · Team: [team name] · Version 3, Sun 15 Nov 2026 (v2: 14 Oct; v1: 13 Oct)
 Prepared by the project lead (drafted with Claude; logged in `AI_USE.md`)
 
 **How to read this file**
@@ -31,6 +31,8 @@ Prepared by the project lead (drafted with Claude; logged in `AI_USE.md`)
 ---
 
 ## 0. This week: the proposal (due Sat 17 Oct, 23:59)
+
+**Done:** we submitted the proposal and the instructor approved it (confirmed 14 Nov). This section is kept as a record.
 
 The proposal is worth 5 of the 30 points, and "full score is given if all the checkpoints above are addressed, and the project is approved by the instructor" [Brief §6.1 p.3]. That means three things: cover all 8 checkpoints, fit on one A4 page at 12 pt [Brief §10 p.6], and include numbers from our own pulls that show we can get the data.
 
@@ -129,7 +131,7 @@ The documents give no due date for the analysis package or the slides, so §11 a
 
 ### 2.1 Proposal: 5 pts [Brief §7.1 p.5]
 
-Full marks need all 8 checkpoints covered plus instructor approval. See §5.
+Full marks need all 8 checkpoints covered plus instructor approval. See §5. The instructor approved our proposal (confirmed 14 Nov).
 
 ### 2.2 Final report: 10 pts [Brief §7.2 p.5]
 
@@ -194,6 +196,8 @@ Full marks need all 8 checkpoints covered plus instructor approval. See §5.
 
 Everything in this section is a **Decision**. It is fixed now so that the outcome and metric are defined before any model comparison [Brief §4 p.3].
 
+**15 Nov:** this section matches the approved proposal and data version 4 of the model tables. On 14 Nov we briefly added weekends and dropped the held-out roads (data version 3), then went back to the proposal the same day. Every change since 14 Oct is dated in `DECISIONS.md`.
+
 ### 4.1 Question
 
 > For traffic-operations staff, can speed bands observed up to time *t* on a road segment and its neighbours, together with recent rainfall and calendar information, predict whether that segment will be in an unusual low-speed state 15 minutes later, for Singapore expressway segments on weekdays between 13 Oct and 20 Nov 2026?
@@ -207,8 +211,8 @@ Why this framing:
 
 ### 4.2 Unit, outcome and labels
 
-- **Unit:** link (LinkID) × LTA update (about every 5 minutes). Time *t* is LTA's `lastUpdatedTime`, which every speed-band response carries (found in the 13 Oct check); our retrieval time is the fallback, flagged in the panel as `t_from_retrieval`.
-- **Norm:** `norm(l, daytype, slot)` is the median band for link *l*, day type (Mon–Thu or Fri) and 15-minute slot. It is computed from **training weeks only** and then frozen.
+- **Unit:** link (LinkID) × LTA update (about every 5 minutes). Time *t* is each row's own `lastUpdatedTime` from LTA, which every speed-band response carries (found in the 13 Oct check; `DECISIONS.md`, 16 Oct). Rows without it are dropped, and the build stops if they are more than 0.1% of the rows.
+- **Norm:** `norm(l, daytype, slot)` is the median band for link *l*, day type and 15-minute slot. It is computed from **training days only** and then frozen. Our rows are weekdays, so they use the weekday level (Mon–Fri, 16 training days). Fridays share it: on days it had not seen, the weekday level fit Fridays slightly better than a Friday-only level built from 4 Fridays (0.331 vs 0.342 bands; `DECISIONS.md`, 14 Nov).
 - **Band deficit:** `d(l,t) = norm(l, daytype, slot) − band(l,t)`.
 - **Unusual state:** `U(l,t) = 1` if `d ≥ 2` at both *t* and *t − 5 min*, i.e. two consecutive snapshots.
 - **Outcome:** `Y(l,t) = U(l, t + 15 min)`. **Onset rows** are rows with `U(l,t) = 0`.
@@ -218,33 +222,34 @@ Why this framing:
 ### 4.3 Population and selection rule (coded, never hand-picked)
 
 - **What we collect:** the whole network. We analyse a pre-specified subset.
-- **Links:** RoadCategory 1 = Expressways (LTA API guide v6.10 §2.19: 1 Expressways, 2 Major Arterial, 3 Arterial, 4 Minor Arterial, 5 Small Roads, 6 Slip Roads, 8 Short Tunnels). 2,598 links on 13 Oct. Keep links present in ≥ 95% of valid snapshots in the first collection week; record the final count `[L]` in `DECISIONS.md`.
+- **Links:** RoadCategory 1 = Expressways (LTA API guide v6.10 §2.19: 1 Expressways, 2 Major Arterial, 3 Arterial, 4 Minor Arterial, 5 Small Roads, 6 Slip Roads, 8 Short Tunnels). 2,598 links on 13 Oct. Keep links present in ≥ 90% of the updates captured 19–23 Oct, 06:00–22:00 (changed from 95% on 11 Nov; `DECISIONS.md`). Every expressway link passes, so `[L]` = 2,598.
 - **Why not major arterials too:** categories 1 + 2 = 27,345 links ≈ 147 M rows, too many for laptop modelling. Expressways also fit the operations-centre audience and give about 10 roads for the held-out-road test. Major arterials stay in the archive as a fallback or secondary analysis.
 - **Time:** weekdays excluding public holidays, 06:00–22:00, which is 192 snapshots per day. Mon 9 Nov is the Deepavali public holiday and is excluded.
-- **Weekends and nights:** descriptive only. Weekend norms would rest on 3 days each, which is too noisy. Nights have little traffic and sit at the band ceiling.
+- **Weekends and nights:** descriptive only. Weekend norms would rest on 3 days each, which is too noisy. Nights have little traffic and sit at the band ceiling. Weekend and holiday rows are in `extra/full_table.parquet` for exploring (`in_population` = FALSE), never in the model files.
 - **F1 closures:** the closures ran to 05:30 Tue 13 Oct, so they end before collection starts and need no exclusion rule.
 
 ### 4.4 Split (dates fixed now)
 
 | Set | Dates | Weekdays used | Purpose |
 |---|---|---|---|
-| Train | Tue 13 Oct – Fri 6 Nov | 19 (15 Mon–Thu, 4 Fri) | Norms, model fitting, cross-validated tuning |
+| Train | Tue 13 Oct – Fri 6 Nov; our data starts Fri 16 Oct (11:10) | 16 (12 Mon–Thu, 4 Fri) | Norms, model fitting, cross-validated tuning |
 | Validation | Sat 7 – Fri 13 Nov | 4 (Mon 9 Nov is a public holiday) | Model selection, calibration, alert threshold |
 | Test | Sat 14 – Fri 20 Nov | 5 | Used once, after the plan freeze |
-| Transfer | 2–3 whole roads (by RoadName), drawn at random with a fixed seed before modelling | Same weeks | Never used in training or tuning; evaluated on the test week |
+| Transfer | AYE and CTE (689 links, column `heldout_road`), drawn at random with seed 20261113 on 11 Nov, before any model | Same weeks | Never used in training or tuning; evaluated on the test week |
 
 - **School calendar:** Term 4 ends Fri 20 Nov and the school holidays start Sat 21 Nov, so the window stays in term time. Schools used as O-Level venues end term on Fri 23 Oct. In EDA, compare weekday peak profiles before and after 23 Oct. If they shift, the rolling-norm sensitivity check becomes important.
-- **Sample size:** `[L]` links × 28 weekdays × 192 snapshots = `[L] × 5,376` rows. With 2,598 expressway links that is about **14.0 M rows**.
+- **Sample size:** 2,598 links × 25 weekdays × 192 snapshots = about **12.5 M rows** (14.0 M with the 28 weekdays of the proposal; our data starts 16 Oct). Usable rows in `train.parquet` (data version 4): 6.40 M train and 1.65 M validation.
 - **Effective sample size:** much smaller than the row count. Rows are strongly autocorrelated, so what limits precision is the number of distinct unusual episodes and of test days. Report episode counts alongside row counts.
 
 ### 4.5 Features (all available at time *t*)
 
 - **Own history:** deficit at *t*, *t − 5*, …, *t − 30*, and the change over the last 15 minutes.
-- **Neighbours:** upstream and downstream neighbour deficits at the same lags. We find neighbours by matching one link's end coordinates to another link's start coordinates, within about 20 m. Congestion spreads upstream, so a slowdown downstream is a plausible early signal. EDA will test this rather than assume it.
-- **Rainfall:** from the station nearest the link midpoint, total over the last 15 and 30 minutes. Only use readings timestamped ≤ *t* − 5 min, as a conservative allowance for publication lag.
-- **Calendar and road:** time of day (15-minute slot), a Friday flag, and road category.
-- **Data age:** a flag when the previous snapshot is missing. Never interpolate.
-- **Planned road works:** LTA's Approved Road Works list (collected daily) is known in advance, so an "active road works on this road today" flag is legitimate information at time *t*. Five of the seven incidents in the 13 Oct check were road works.
+- **Neighbours:** upstream and downstream neighbour deficits at the same lags. We find neighbours by matching one link's end coordinates to another link's start coordinates, within 5 m (changed from about 20 m on 14 Nov: almost all links meet at 0 m, and 20 m matched links on the other side of the road). Congestion spreads upstream, so a slowdown downstream is a plausible early signal. EDA will test this rather than assume it.
+- **Roads that join (added 11 Nov, data version 2):** the largest deficit among the roads leading into the link, and among those leading out of it (any road category, joined within 5 m), at the same lags and against their own training-day norm (`f_conn_*`). Models are compared with and without them.
+- **Rainfall:** from the station nearest the link midpoint, among the stations with readings in at least 80% of the 5-minute slots on every training day (82 of 90 stations with these training days), total over the last 15 and 30 minutes. Only use readings timestamped ≤ *t* − 5 min, as a conservative allowance for publication lag.
+- **Calendar:** time of day (15-minute slot) and the day of the week, one-hot `f_mon` … `f_fri` (it includes the Friday flag; 14 Nov). Road category is the same for every link (expressways), so it is not an input.
+- **Missing updates:** a missing update reuses the previous update's value for at most 5 minutes, and `f_n_filled` counts how many of the last 7 values were reused (14 Nov). Never interpolate.
+- **Planned road works:** LTA's Approved Road Works list (collected daily) is known in advance, so an "active road works on this road today" flag is legitimate information at time *t*. Five of the seven incidents in the 13 Oct check were road works. Not built yet (14 Nov): it needs code to read LTA's road works list.
 - **Incidents:** used to audit labels. Use them as a predictor only in a sensitivity run, only incidents reported before *t*, and never the "Heavy Traffic" type, which is itself a congestion report and would be circular.
 
 ### 4.6 Methods and their roles [Brief §3.3 p.2]
@@ -270,7 +275,7 @@ If the training set is too big for `ranger`, subsample the negatives with a fixe
   - event level: the share of test episodes warned at least 10 minutes before onset, and false alarms per hour.
 - **Prevalence:** report it next to every PR-AUC, because it's the PR-AUC a random scorer would get.
 - **Uncertainty:** 95% intervals from a block bootstrap over test days. Use a paired bootstrap for the model − baseline differences. Five test days is thin, and we'll say so.
-- **Subgroups:** expressway vs arterial, peak vs off-peak, rain vs dry, and the held-out roads.
+- **Subgroups:** peak vs off-peak, rain vs dry, by road, and the held-out roads.
 
 ### 4.8 EDA plan [Brief §3.3 p.2]
 
@@ -287,7 +292,7 @@ If the training set is too big for `ranger`, subsample the negatives with a fixe
 - **Sensitivity checks:**
   - threshold (1 band for 3 snapshots);
   - horizon (5, 10 and 30 minutes);
-  - norm (frozen vs rolling 21-day, and a leave-own-day-out norm for training rows);
+  - norm (frozen vs rolling 21-day, and a leave-own-day-out norm for training rows: `extra/train_lodo.parquet`, 14 Nov);
   - with and without neighbour features;
   - with and without incident features.
 - **Failure case for the talk:** for example, incident-driven onsets with no precursor, or the floor effect at peak.
@@ -371,7 +376,7 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
 
 ### 6.1 Practices, starting now
 
-1. **Raw data is never edited.** The collector saves responses exactly as received (gzipped), writing each file under a temporary name and renaming it, so no file is ever half-written. Processing reads raw files and writes processed ones, and processed files can always be rebuilt (`04_process.ipynb`).
+1. **Raw data is never edited.** The collector saves responses exactly as received (gzipped), writing each file under a temporary name and renaming it, so no file is ever half-written. Processing reads raw files and writes processed ones, and processed files can always be rebuilt (`./build_processed.sh`, which runs `analysis/build_data.py`).
 2. **Self-healing collector.** Retries with back-off, consistency checks on every snapshot, one feed failing never stops the others, and a service manager restarts it after a crash or reboot: systemd within 30 s on the Linux mini PC (`docs/LINUX_SETUP_FOR_CLAUDE_CODE.md`), or the Windows watchdog task within 10 minutes. Healthchecks.io e-mails us if pings stop.
 3. **Daily health check (2 minutes, data lead).** `~/slds-1.3/check.sh` on the mini PC (both collectors: heartbeat, files today, last hour's fetches, errors, disk), or monitor notebook cell 5 on the desktop. Post one line in the team chat.
 4. **Backups.** Since 16 Oct both collectors run on the Linux mini PC (two keys, §6.3); the desktop holds 14–16 Oct and is a cold spare. Copy `data_raw/` and `data_raw_expressway/` to an external drive or a team-only cloud folder at least weekly from 21 Oct. (24 Oct: replaced by the nightly Google Drive upload, `upload_raw.sh`; see `DECISIONS.md`.)
@@ -385,7 +390,7 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
    - Before submission, a member who didn't write the pipeline reruns everything from a clean clone [Brief §6.2 p.4].
 9. **Write as we go.** Start the 8-section `report.qmd` skeleton now. Each workstream drafts its section as soon as its work is done. Update the data dictionary whenever a variable is added.
 10. **Grading records.** Update `CONTRIBUTIONS.md` weekly and `AI_USE.md` after every AI session [Brief §5 p.3, §6.3 p.4].
-11. **Schema and endpoint changes.** Endpoints are set at the top of `lta_collector.py`. The processing notebook's quality report (updates per day, coverage, missing bands, time-format fallback) shows quickly if LTA changes the feed.
+11. **Schema and endpoint changes.** Endpoints are set at the top of `lta_collector.py`. The build's 107 checks (`analysis/build_data.py`, listed in `extra/build_info.json`) stop it if LTA changes the feed: for example if the 2,598 expressway links change, or more than 0.1% of rows have no update time or a band outside 1–8.
 12. **Key hygiene.** Keys live only in `.Renviron` (or a Windows user variable). Never commit them, and never paste them into chats or AI tools; LTA's terms require keeping credentials confidential.
 
 ### 6.2 Scope ladder: what to cut if time runs out
@@ -404,7 +409,7 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
 | Data lost with the mini PC (disk failure, accident) | — | Weekly copy of `data_raw/` and `data_raw_expressway/` to an external drive or cloud folder from 21 Oct at the latest; the desktop keeps 14–16 Oct |
 | LTA rate limit (found 16 Oct) | `probe_failed` / `fetch_failed` with "Rate limit quota violation" | Unpublished limit of about 4,000 calls per key per clock hour, reset on the hour. Fixed 16 Oct: each update fetched once, no retries on rate-limit faults, pause to the hour; one key per collector (`DECISIONS.md`, 16 Oct) |
 | Pages carry different update times | `log_speedbands.csv`: nearly every fetch `ok_flagged`, mixed `lastUpdatedTime` | Not a timing glitch: LTA serves pages from out-of-sync servers, so refetching never gives a clean snapshot (refetching was removed 16 Oct; it exhausted the rate limit). Each row keeps its own `last_updated`, which is reliable (9.7 M repeats, 0 conflicts), and processing uses it as *t*. To keep the expressway series complete, a second collector fetches the 58 expressway pages every 2 min (option C, decided 16 Oct) |
-| LinkIDs change | Registry shows new or vanished IDs | Match by coordinates; keep links present in ≥ 95% of snapshots |
+| LinkIDs change | Registry shows new or vanished IDs; the build stops if the 2,598 expressway links change | Decide by hand (match by coordinates); keep links present in ≥ 90% of updates (11 Nov) |
 | Too few unusual events | Only a few hundred onset episodes in the training weeks | Add major-arterial (category 2) links, use the 1-band rule or a 10-minute horizon, and document the change in `DECISIONS.md` |
 | Endpoint or schema change | Schema warning in the log | Update the path in config; parse fields by name |
 | Traffic drifts within the window | Peak profiles differ before and after 23 Oct | Rolling-norm sensitivity check; a post-23-Oct flag |
@@ -458,7 +463,7 @@ Source checks: `00_check_sources.ipynb` (R, run 13 Oct) and `00_check_sources_py
 | **Sun 6 Dec, 23:59** | **Report deadline** | Lead |
 | **7–13 Dec** | **Presentation and defence** | All |
 
-Keep the collector running until at least Fri 20 Nov, 23:59, or until Fri 27 Nov if we do the stress test.
+Keep the collector running until at least Sat 21 Nov, 01:00 (the late rows of Fri 20 Nov), or until Fri 27 Nov if we do the stress test. Build the test file on Sat 21 Nov after 04:30, and upload it only after the plan freeze (`SHARE_TEST=1 ./build_processed.sh`).
 
 ---
 

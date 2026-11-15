@@ -1,4 +1,4 @@
-# The rules behind the model tables (data version 3)
+# The rules behind the model tables (data version 4)
 
 These are the rules the model tables follow, written so that someone can recompute any row without reading the
 pipeline code. `analysis/verify_data.py` does exactly that for a sample of rows, straight from the raw files; it
@@ -29,10 +29,16 @@ All times are Singapore local time without a zone. "5 min" steps: LTA updates ev
    `last_updated` = t. If there are several, take the one with the earliest `retrieved_at` (a tie goes to the
    earlier file name, `data_raw` before `data_raw_expressway`; the copies have never disagreed).
 2. **Expressway links**: RoadCategory 1. There must be 2,598; all of them are in the tables.
+2a. **Held-out roads** (the proposal's transfer check): take the `road` values (rule 20) of the expressway links,
+   without ALJUNIED WEST FLYOVER and KALLANG BAHRU FLYOVER, as a list sorted alphabetically (10 roads), and draw
+   2 with Python's `random.Random(20261113).sample(that_list, 2)`. This gives AYER RAJAH EXPRESSWAY and CENTRAL
+   EXPRESSWAY. `heldout_road` = TRUE for every link on those roads (689 links), else FALSE.
 3. **Day type** of a date: `sunday_or_holiday` if it is a public holiday or a Sunday; `saturday` if Saturday;
    else `weekday`.
-4. **Split** by the date of t: `train` 2026-10-16 to 2026-11-08; `validate` 2026-11-09 to 2026-11-15;
-   `test` 2026-11-16 to 2026-11-22.
+4. **Split** by the date of t: `train` 2026-10-16 to 2026-11-06; `validate` 2026-11-07 to 2026-11-13;
+   `test` 2026-11-14 to 2026-11-20 (the proposal's split; its train starts 13 Oct, our data 16 Oct).
+4a. **Population days** (the proposal's days): `in_population` = TRUE when the day type is `weekday` (Monday to
+   Friday and not a public holiday), else FALSE.
 5. **Slot** of t: hour * 4 + minute // 15 (0-95).
 6. **Normal level** norm(l, daytype, slot) = median of all bands of link l at the times t (any hour of the day)
    whose date is a train day of that day type and whose slot is that slot. Median of an even count = mean of
@@ -69,26 +75,32 @@ All times are Singapore local time without a zone. "5 min" steps: LTA updates ev
     Rain totals are exact: a window with no rain is exactly 0.0, and every total is a whole number of tenths
     of a mm.
 17. **f_slot15** = slot(t). **f_mon** ... **f_sun** = one-hot of the weekday of t. **f_holiday** = 1 on a
-    public holiday.
-18. **Rows**: every expressway link x every t from 06:00 to 21:55 on every finished day. A day is finished when
+    public holiday. The main files (train.parquet, test.parquet, train_lodo.parquet) leave out f_sat, f_sun and
+    f_holiday (always 0 on population days); the full tables keep them.
+18. **Rows** (of the full tables): every expressway link x every t from 06:00 to 21:55 on every finished day of
+    the splits, every day of the week. A day is finished when
     the rainfall table has at least one reading timestamped 23:55 that day and it is 02:00 the next day. Rows exist also when the update is
     missing.
 19. **use** = y known AND U known AND every one of these known: f_d0 ... f_d30, f_d_change15, f_n_filled,
     f_up_d*, f_dn_d*, f_up_none, f_dn_none, rain inputs and flags, f_slot15, f_mon ... f_sun, f_holiday.
     (The f_conn_* inputs are not required.)
-20. **Files** in `data_processed/model/`: `train.parquet` = the `use` rows of the train and validate days;
-    `extra/full_table.parquet` = every row of those days with `use`, `y_h*` and `info_*` columns
+20. **Files** in `data_processed/model/`: `train.parquet` = the rows with `use` AND `in_population` of the train
+    and validate days, with LinkID, road, heldout_road, t, date, daytype, split, y, U and the f_ columns (without
+    the three of rule 17); `extra/full_table.parquet` = every row of those days (all days of the week) with
+    the same columns plus `in_population`, `use`, `y_h*`, f_sat, f_sun, f_holiday and `info_*` columns
     (`info_band` = band at t, `info_norm_band`, `info_deficit` = d at t, `info_low`, `info_rain_mm` = the
     reading at t, `info_station_id`, `info_station_km`, `info_school_period` = the calendar's school period,
-    `info_retrieved` = the `retrieved_at` of the band chosen by rule 1); `test.parquet` once test days exist;
+    `info_retrieved` = the `retrieved_at` of the band chosen by rule 1); `test.parquet` and `extra/test_full.parquet`
+    the same for the test days once they exist;
     `extra/norm.parquet` (LinkID, daytype, slot15, norm_band, n_obs = bands in the median, n_days = train days
     with a band in the cell); `extra/connector_norm.parquet` (the same for the joining roads);
     `extra/neighbours.parquet` (LinkID, downstream, gap_m); `extra/connectors.parquet` (LinkID = joining road,
     joins = expressway link, kind = into / out_of); `extra/links.parquet` (one row per expressway link, with
-    station_id and station_km); `road` = RoadName, with the KPE tunnel counted as KPE.
+    station_id, station_km and heldout_road); `road` = RoadName, with the KPE tunnel counted as KPE.
 21. **Rounding in the output tables**: `station_km` and `info_station_km` are rounded to 3 decimals and `gap_m`
     (in neighbours.parquet and connectors.parquet) to 2 decimals.
-22. **extra/train_lodo.parquet**: the train days again, same columns as train.parquet, but for a row on train day
-    d every normal level (of the link, its neighbours and its joining roads) is the median over the train days of
-    that day type EXCEPT d (rules 6 and 15 with day d left out). Everything else (rules 7-19) is the same, computed
-    with that normal level. It holds the use == TRUE rows of the train days under that rule.
+22. **extra/train_lodo.parquet**: the train days that are population days (rule 4a) again, same columns as
+    train.parquet, but for a row on train day d every normal level (of the link, its neighbours and its joining
+    roads) is the median over the train days of that day type EXCEPT d (rules 6 and 15 with day d left out).
+    Everything else (rules 7-19) is the same, computed with that normal level. It holds the rows with use ==
+    TRUE of those days under that rule.

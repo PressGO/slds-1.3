@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""verify_data.py - an independent check of the model tables (data version 3), straight from the raw files.
+"""verify_data.py - an independent check of the model tables (data version 4), straight from the raw files.
 
 WHAT IT CHECKS
   A second implementation of the rules in docs/data_rules.md (rules 1-22; the rule numbers in the comments
@@ -15,7 +15,7 @@ WHAT IT CHECKS
   2. extra/train_lodo.parquet (rule 22): a sample (--lodo-rows, default 500, spread evenly over all train days
      and so over all day types, about a quarter of them y TRUE), every column recomputed with the
      leave-own-day-out normal level of the link, its neighbours and its joining roads. And 3 whole train days
-     (a weekday, a Saturday, a Sunday or holiday; seeded, never the half-collected first day): every link x
+     (population weekdays, rule 4a; seeded, never the half-collected first day): every link x
      5-min time, the use rows must be exactly the table's rows of that day, with the same y and U. The report
      also counts how many of these rows leaving the day out changes, so an OK means something.
   3. Link attributes from the raw registry snapshots: the 2,598 expressway links, their neighbours (rule 13),
@@ -24,7 +24,8 @@ WHAT IT CHECKS
   4. The raw speed bands of every expressway link and joining road, from the CSV files of both collectors.
   5. Every column of every sampled row: exact for integers, booleans, strings, dates, times and rain (rule 16:
      whole tenths of a mm); other floats within 1e-6; null equals only null.
-  6. Whole-table checks: (a) train.parquet = the use rows of full_table, value for value; (b) the links of
+  6. Whole-table checks: (a) train.parquet = the use rows on population days of full_table (rules 4a, 20), value
+     for value, without f_sat, f_sun, f_holiday; held-out roads drawn as rule 2a says; (b) the links of
      full_table = the RoadCategory-1 links; (c) extra/norm.parquet for 50 sampled links and
      extra/connector_norm.parquet for their joining roads; (d) split and day type of every row, and every link
      x 5-min time 06:00-21:55 on every day; (e) rain totals never below 0, never in (0, 0.1) and always whole
@@ -87,9 +88,14 @@ CONNECTORS = os.path.join(MODEL, "extra", "connectors.parquet")
 LINKS = os.path.join(MODEL, "extra", "links.parquet")
 
 # ---- the numbers of the rules, typed in from docs/data_rules.md (NOT taken from the pipeline) ----
-SPLITS = (("train", date(2026, 10, 16), date(2026, 11, 8)),        # rule 4
-          ("validate", date(2026, 11, 9), date(2026, 11, 15)),
-          ("test", date(2026, 11, 16), date(2026, 11, 22)))
+SPLITS = (("train", date(2026, 10, 16), date(2026, 11, 6)),        # rule 4
+          ("validate", date(2026, 11, 7), date(2026, 11, 13)),
+          ("test", date(2026, 11, 14), date(2026, 11, 20)))
+POPULATION = ("weekday",)                # rule 4a: in_population = day type weekday
+HELDOUT_SEED, HELDOUT_N = 20261113, 2    # rule 2a
+NEVER_HELD_OUT = ("ALJUNIED WEST FLYOVER", "KALLANG BAHRU FLYOVER")      # rule 2a
+EXPECTED_HELDOUT = ("AYER RAJAH EXPRESSWAY", "CENTRAL EXPRESSWAY")      # rule 2a: what the draw gives
+MAIN_DROP = ("f_sat", "f_sun", "f_holiday")                             # rule 17: not in the main files
 N_EXPRESSWAY = 2598                      # rule 2
 EXPRESSWAY = "1"                         # rule 2: RoadCategory "1"
 TOL_M = 5.0                              # rules 13 and 15: within 5 m
@@ -144,6 +150,10 @@ def daytype(d):                          # rule 3
     if d.weekday() == 5:
         return "saturday"
     return "weekday"
+
+
+def in_population(d):                    # rule 4a
+    return daytype(d) in POPULATION
 
 
 def split_of(d):                         # rule 4
@@ -249,7 +259,9 @@ def check_settings():
         "HORIZON": 15, "EXTRA_HORIZONS": (5, 10, 30), "LAGS": LAGS, "CARRY_MAX": 5, "RAIN_LAG": 5,
         "RAIN_WINDOWS": {"f_rain15": 15, "f_rain30": 30}, "HOUR_FROM": 6, "HOUR_TO": 22, "STEP_MIN": 5,
         "LATE_ROWS_MIN": 60, "FINISHED_AFTER_H": 2, "DAYTYPES": DAYTYPES, "WEEKDAY_COLUMNS": WEEKDAY_COLS,
-        "NORM_SPLIT": "train", "DATA_VERSION": "3", "ROAD_GROUPS": ROAD_GROUPS, "RAIN_STATION_MIN_SHARE": 0.80,
+        "NORM_SPLIT": "train", "DATA_VERSION": "4", "ROAD_GROUPS": ROAD_GROUPS, "RAIN_STATION_MIN_SHARE": 0.80,
+        "POPULATION_DAYTYPES": POPULATION, "HELDOUT_N": HELDOUT_N, "HELDOUT_SEED": HELDOUT_SEED,
+        "NEVER_HELD_OUT": NEVER_HELD_OUT, "EXPECTED_HELDOUT": EXPECTED_HELDOUT, "NOT_IN_MAIN_FILES": MAIN_DROP,
     }
     bad = [(k, v, getattr(ds, k, "<missing>")) for k, v in mine.items()
            if getattr(ds, k, "<missing>") != v and not (isinstance(v, tuple) and tuple(getattr(ds, k, ())) == v)]
@@ -703,7 +715,8 @@ def compute_row(ctx, lid, t, rules=None, strict_conn=False, strict_nbr=False):
     i, s0, d0 = idx[lid], tindex(t), t.date()
     name = ctx.links[lid].name
     out = {"LinkID": lid, "t": t, "date": d0, "road": ROAD_GROUPS.get(name, name),   # rule 20
-           "daytype": daytype(d0), "split": split_of(d0)}
+           "daytype": daytype(d0), "split": split_of(d0), "in_population": in_population(d0)}   # rule 4a
+    out["heldout_road"] = out["road"] in ctx.heldout                     # rule 2a
     out["U"] = R.unusual(i, s0)                                           # rule 9
     for col, minutes in LABELS:                                           # rule 10
         out[col] = R.unusual(i, s0 + minutes // 5)
@@ -845,10 +858,11 @@ def compare_maps(name, mine, theirs, what, fields=None):
 def check_use_rows(small_path, full_path):
     """(a) train.parquet (test.parquet) holds exactly the use rows of full_table (test_full), with identical
     values in its columns."""
-    name = f"(a) {os.path.basename(small_path)} = use rows of {os.path.basename(full_path)}"
+    name = f"(a) {os.path.basename(small_path)} = use rows on population days of {os.path.basename(full_path)}"
     if not (os.path.exists(small_path) and os.path.exists(full_path)):
         return Check(name, 0, 1, "one of the two files is missing")
-    use = pl.scan_parquet(full_path).select("use").collect()["use"].fill_null(False)
+    use = (pl.scan_parquet(full_path).select(pl.col("use").fill_null(False) & pl.col("in_population"))
+           .collect().to_series())                    # rules 4a and 20
     t_keys = pl.scan_parquet(small_path).select("LinkID", "t").collect()
     f_keys = pl.scan_parquet(full_path).select("LinkID", "t").collect().filter(use)
     order_t = order_f = None
@@ -864,6 +878,14 @@ def check_use_rows(small_path, full_path):
     t_schema = pl.read_parquet_schema(small_path)
     f_schema = pl.read_parquet_schema(full_path)
     bad, examples, compared = 0, [], 0
+    for col in MAIN_DROP:                             # rule 17: not in the main files
+        if col in t_schema:
+            bad += 1
+            examples.append(f"{col} is in {os.path.basename(small_path)}")
+    for col in ("heldout_road", "split", "y", "U"):   # rule 20
+        if col not in t_schema:
+            bad += 1
+            examples.append(f"{col} is missing from {os.path.basename(small_path)}")
     for col, dtype in t_schema.items():
         if col not in f_schema or f_schema[col] != dtype:
             bad += 1
@@ -974,7 +996,8 @@ def check_rain_totals(paths):
 
 
 def check_lodo_days(train_days):
-    """train_lodo (rule 22) holds only train days (all of them), with split, day type and date as rules 3-4."""
+    """train_lodo (rule 22) holds only the population train days (all of them), with split, day type and date as
+    rules 3-4a."""
     lf = pl.scan_parquet(LODO)
     combos = lf.group_by("date", "daytype", "split").agg(pl.len().alias("rows")).collect(engine="streaming")
     bad, examples = 0, []
@@ -987,8 +1010,8 @@ def check_lodo_days(train_days):
     bad += wrong_date + len(missing)
     if missing:
         examples.append(f"train days without rows: {missing[:3]}")
-    return Check("train_lodo: only and all train days; split, day type", int(combos["rows"].sum()), bad,
-                 f"{combos['date'].n_unique()} days (train days: {len(train_days)})", examples[:3])
+    return Check("train_lodo: only and all population train days; split, day type", int(combos["rows"].sum()), bad,
+                 f"{combos['date'].n_unique()} days (population train days: {len(train_days)})", examples[:3])
 
 
 # ======================================================================================================
@@ -1143,6 +1166,8 @@ def coverage(ctx, mine_rows):
         lid, s0 = m["LinkID"], tindex(m["t"])
         c[f"daytype {m['daytype']}"] += 1
         c[f"split {m['split']}"] += 1
+        c["in_population FALSE"] += m["in_population"] is False
+        c["held-out road"] += m["heldout_road"] is True
         c["public holiday"] += m["f_holiday"] == 1
         c["use TRUE"] += m["use"] is True
         c["use FALSE"] += m["use"] is False
@@ -1239,6 +1264,13 @@ def main():
         except (TypeError, ValueError):
             bad_coords.append(lid)
     expressway = {lid for lid, link in links.items() if link.category == EXPRESSWAY}
+    # rule 2a: the held-out roads, drawn from the sorted road names of the expressway links
+    road_pool = sorted({ROAD_GROUPS.get(links[lid].name, links[lid].name) for lid in expressway} - set(NEVER_HELD_OUT))
+    heldout = sorted(random.Random(HELDOUT_SEED).sample(road_pool, HELDOUT_N))
+    n_held = sum(ROAD_GROUPS.get(links[lid].name, links[lid].name) in heldout for lid in expressway)
+    checks.append(Check("held-out roads: the draw of rule 2a gives the roads it names", len(road_pool),
+                        int(tuple(heldout) != EXPECTED_HELDOUT),
+                        f"{len(road_pool)} roads in the draw; held out {heldout}, {n_held} links", []))
     log(f"registry: {reg_stats['files']} snapshot files up to {last_day}, {reg_stats['records']:,} records, "
         f"{len(latest):,} links, {len(expressway):,} expressway links (newest snapshot "
         f"{reg_stats['newest retrieved_at']})")
@@ -1286,10 +1318,11 @@ def main():
         if rain_stats[label]:
             notes.append(f"rain: {rain_stats[label]} {label}")
 
-    lk_cols = ["RoadName", "RoadCategory", "StartLon", "StartLat", "EndLon", "EndLat", "road", "n_downstream",
-               "n_upstream", "n_roads_into", "n_roads_out_of", "station_id", "station_km"]
+    lk_cols = ["RoadName", "RoadCategory", "StartLon", "StartLat", "EndLon", "EndLat", "road", "heldout_road",
+               "n_downstream", "n_upstream", "n_roads_into", "n_roads_out_of", "station_id", "station_km"]
     lk_mine = {lid: (links[lid].name, int(links[lid].category), links[lid].start_lon, links[lid].start_lat,
                      links[lid].end_lon, links[lid].end_lat, ROAD_GROUPS.get(links[lid].name, links[lid].name),
+                     ROAD_GROUPS.get(links[lid].name, links[lid].name) in heldout,
                      len(down.get(lid, [])), len(up.get(lid, [])), len(into.get(lid, [])), len(out_of.get(lid, [])),
                      station[lid][0], round(station[lid][1], KM_DECIMALS)) for lid in expressway}
     lk_tab = {r[0]: tuple(r[1:]) for r in pl.read_parquet(LINKS).select(["LinkID"] + lk_cols).iter_rows()}
@@ -1328,7 +1361,7 @@ def main():
     rules = Rules(store, train_days)
     ctx = Context(rules=rules, store=store, links=links, up=up, down=down, into=into, out_of=out_of,
                   station=station, readings=readings, stations=stations, eligible=eligible,
-                  train_days=train_days, expressway=sorted(expressway))
+                  train_days=train_days, expressway=sorted(expressway), heldout=set(heldout))
     mine_rows = [compute_row(ctx, r["LinkID"], r["t"]) for r in sample_rows]
     results = compare_rows(sample_rows, mine_rows, schema)
     log(f"compared {len(sample_rows):,} rows x {len(schema)} columns")
@@ -1369,8 +1402,10 @@ def main():
                      zip(lodo_mine, (compute_row(ctx, r["LinkID"], r["t"]) for r in lodo_rows)))
     log(f"train_lodo sample: {len(lodo_rows)} rows over {len({r['t'].date() for r in lodo_rows})} days "
         f"({', '.join(f'{k} {v}' for k, v in sorted(lodo_cov.items()))}), y TRUE {sum(r['y'] is True for r in lodo_rows)}")
-    # whole days: one of each day type, not the first train day (collection started at 11:20 that day)
-    lodo_days = [lodo_rng.choice([d for d in train_days if daytype(d) == dt and d != train_days[0]]) for dt in DAYTYPES]
+    # whole days: 3 population train days (rule 22 covers only those), not the first train day (collection
+    # started at 11:10 that day)
+    lodo_pop = [d for d in train_days if in_population(d)]
+    lodo_days = sorted(lodo_rng.sample([d for d in lodo_pop if d != train_days[0]], 3))
     sample_by_day = defaultdict(list)
     for r, m in zip(lodo_rows, lodo_mine):
         sample_by_day[r["t"].date()].append(m)
@@ -1398,7 +1433,7 @@ def main():
                             f"day out changes (use, y, U) of {day_teeth:,} link-times", examples))
         log(f"train_lodo whole day {d} ({daytype(d)}): mine {len(mine_use):,} use rows, table {len(tab_rows):,}")
         del mine_day, tab, tab_rows, mine_use
-    checks.append(check_lodo_days(train_days))
+    checks.append(check_lodo_days(lodo_pop))
 
     # ---- 7. whole-table checks ----
     checks.append(check_norm_cells(rules, store, norm_links, NORM, "(c) norm.parquet, 50 sampled links"))
@@ -1419,7 +1454,8 @@ def main():
     now = datetime.now()
     rain_2355 = {t.date() for rd in readings.values() for t in rd if t.hour == 23 and t.minute == 55}
     finished = [d for d in all_days + [last_day + timedelta(days=k) for k in range(1, 15)]
-                if d in rain_2355 and now >= datetime.combine(d + timedelta(days=1), time(0, 0)) + FINISHED_AFTER]
+                if d in rain_2355 and now >= datetime.combine(d + timedelta(days=1), time(0, 0)) + FINISHED_AFTER
+                and d <= SPLITS[-1][2]]                  # rule 18: days of the splits only
     problems = ([f"finished but not in the table: {d}" for d in finished if d not in days]
                 + [f"in the table but not finished: {d}" for d in days if d not in finished]
                 + [f"missing day inside the range: {d}" for d in all_days if d not in days])

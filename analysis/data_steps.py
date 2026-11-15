@@ -1,4 +1,4 @@
-"""data_steps.py - the steps that turn the raw LTA files into the model tables (data version 3).
+"""data_steps.py - the steps that turn the raw LTA files into the model tables (data version 4).
 
 Each function takes tables and returns tables; only the read_* functions touch files, and nothing here writes.
 build_data.py runs the steps in order and checks every result; test_data_steps.py tests each step on small
@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import random
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -66,14 +67,23 @@ def split_of(d: pl.Expr) -> pl.Expr:
 
 
 def day_table(first: date, last: date, holidays: set[date]) -> pl.DataFrame:
-    """One row per date: weekday (1 = Monday), is_holiday, daytype, split."""
+    """One row per date: weekday (1 = Monday), is_holiday, daytype, split, in_population (the proposal's days:
+    day type in POPULATION_DAYTYPES, i.e. Monday to Friday and not a public holiday)."""
     days = pl.DataFrame({"date": pl.date_range(first, last, "1d", eager=True)})
     return (days.with_columns(pl.col("date").dt.weekday().cast(pl.Int8).alias("weekday"),
                               pl.col("date").is_in(sorted(holidays)).alias("is_holiday"))
                 .with_columns(pl.when(pl.col("is_holiday") | (pl.col("weekday") == 7)).then(pl.lit("sunday_or_holiday"))
                                 .when(pl.col("weekday") == 6).then(pl.lit("saturday"))
                                 .otherwise(pl.lit("weekday")).alias("daytype"),
-                              split_of(pl.col("date")).alias("split")))
+                              split_of(pl.col("date")).alias("split"))
+                .with_columns(pl.col("daytype").is_in(list(S.POPULATION_DAYTYPES)).alias("in_population")))
+
+
+def heldout_roads(roads: list[str]) -> list[str]:
+    """The roads held out for the transfer check: HELDOUT_N of the roads (without NEVER_HELD_OUT), drawn with
+    HELDOUT_SEED from the sorted list, so the order of the input never matters. The same draw as data v1-v2."""
+    pool = sorted(set(roads) - set(S.NEVER_HELD_OUT))
+    return sorted(random.Random(S.HELDOUT_SEED).sample(pool, S.HELDOUT_N))
 
 
 # ----------------------------------------------------------------------------------------------------------
@@ -431,6 +441,11 @@ def core_input_columns() -> list[str]:
             + [f"f_{s}_{c}" for s in ("up", "dn") for c in DCOLS] + ["f_up_none", "f_dn_none"]
             + list(S.RAIN_WINDOWS) + [f"{n}_missing" for n in S.RAIN_WINDOWS]
             + ["f_slot15", *S.WEEKDAY_COLUMNS, "f_holiday"])
+
+
+def model_input_columns() -> list[str]:
+    """The core inputs in the main files: without NOT_IN_MAIN_FILES (always 0 on the population's days)."""
+    return [c for c in core_input_columns() if c not in S.NOT_IN_MAIN_FILES]
 
 
 def connector_input_columns() -> list[str]:
