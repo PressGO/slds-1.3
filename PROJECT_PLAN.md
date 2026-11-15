@@ -453,9 +453,8 @@ Source checks: `00_check_sources.ipynb` (R, run 13 Oct) and `00_check_sources_py
 | After approval | Build the pipeline on data so far (first two weeks as a development set); EDA; feature code | All |
 | Fri 30 Oct | `DECISIONS.md` v1 frozen: label rule, features, metrics, transfer roads (seeded draw) | Lead |
 | Sat 7 Nov | Norms frozen from the training weeks; training panel built | Labels lead |
-| 7–13 Nov | Fit and tune with forward-chaining CV inside the training weeks | Models leads |
-| Sat 14 – Sun 15 Nov | Validation-week evaluation; final model choice; *k* and calibration set | Models leads |
-| Fri 20 Nov | **Plan freeze**: git tag `plan-freeze` before any test-week analysis | Lead |
+| Sun 15 – Fri 20 Nov | Fit and tune with forward-chaining CV inside the training weeks (data version 4, on Drive since 15 Nov); then the validation-week evaluation, final model choice, *k* and calibration. All before the freeze | Models leads |
+| Fri 20 Nov | **Plan freeze** (date confirmed 15 Nov): git tag `plan-freeze` before any test-week analysis. Commit the model scripts and the chosen settings first. Until the tag, nobody opens test-week data, including the raw files of 14–20 Nov on Drive | Lead |
 | Sat 21 – Sun 22 Nov | Run `90_final_test.R` once and record every result, including negative ones | Models lead |
 | 23–29 Nov | Diagnostics, sensitivity, transfer, figures. Optional school-holiday stress test (needs collection to 27 Nov) | All |
 | Mon 30 Nov | Full report draft | Report lead |
@@ -463,7 +462,7 @@ Source checks: `00_check_sources.ipynb` (R, run 13 Oct) and `00_check_sources_py
 | **Sun 6 Dec, 23:59** | **Report deadline** | Lead |
 | **7–13 Dec** | **Presentation and defence** | All |
 
-Keep the collector running until at least Sat 21 Nov, 01:00 (the late rows of Fri 20 Nov), or until Fri 27 Nov if we do the stress test. Build the test file on Sat 21 Nov after 04:30, and upload it only after the plan freeze (`SHARE_TEST=1 ./build_processed.sh`).
+Keep both collectors running after the test week (decided 15 Nov; no end date yet). Never stop them before Sat 21 Nov, 01:00 (the late rows of Fri 20 Nov). The optional stress test needs data to Fri 27 Nov. Data after Fri 20 Nov is not used for the main results. Build the test file on Sat 21 Nov after 04:30, and upload it only after the plan freeze (`SHARE_TEST=1 ./build_processed.sh`).
 
 ---
 
