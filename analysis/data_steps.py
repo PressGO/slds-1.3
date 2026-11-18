@@ -10,7 +10,6 @@ AI disclosure: drafted with Claude (Anthropic) on 14 Nov 2026; log in AI_USE.md.
 
 from __future__ import annotations
 
-import gzip
 import json
 import random
 import re
@@ -503,12 +502,6 @@ def incident_episodes(snaps: pl.DataFrame) -> pl.DataFrame:
                       pl.col("Latitude").alias("lat"), pl.col("Longitude").alias("lon"),
                       "first_seen", "last_seen_before", "reported")
               .sort("first_seen", "type", "message", "lat", "lon"))
-
-
-def read_json_lines_count(path: Path) -> int:
-    """Pages in a raw snapshot file (for the registry check: a full network snapshot has 288)."""
-    with gzip.open(path, "rt", encoding="utf-8") as f:
-        return sum(1 for _ in f)
 
 
 def to_json(obj) -> str:

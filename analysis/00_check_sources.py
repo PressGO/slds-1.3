@@ -1,7 +1,7 @@
 """00_check_sources.py - SLDS 42.510 project 1.3: one-off check of the planned data sources.
 
-Python port of 00_check_sources.R: same requests, same checks, same outputs.
-Standard library only (Python 3.9+), like the collector.
+The first version (run 13 Oct) was in R; this Python version (run 16 Oct) makes the same
+requests and checks. Standard library only (Python 3.9+), like the collector.
 
 For each source the script makes a few requests, saves every raw response
 (gzipped) with retrieval metadata, and prints data-quality checks you can quote
@@ -9,13 +9,13 @@ as "evidence that the data are accessible" (Brief §6.1). It is a check, not the
 collector. Run it once now, and again if an endpoint changes.
 
 Setup
-  Keys are read from .Renviron in the project folder (the same file the R scripts
-  and the collector use), else from environment variables of the same name:
+  Keys are read from .Renviron in the project folder (the same file the collector
+  uses), else from environment variables of the same name:
     LTA_ACCOUNT_KEY=<your LTA DataMall AccountKey>
     DATAGOVSG_API_KEY=<optional data.gov.sg key; raises rate limits>
 
 Run from the project folder
-  python3 analysis/00_check_sources.py      (or 00_check_sources_python.ipynb)
+  python3 analysis/00_check_sources.py
 
 Outputs in data_raw/source_check/ (new files each run, nothing overwritten)
   raw/<source>/<run>_p<page>.json.gz   raw response bodies

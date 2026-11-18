@@ -9,6 +9,8 @@
 #                             test.parquet and extra/test_full.parquet only with SHARE_TEST=1 (after the freeze)
 #   ./build_processed.sh              build, check and upload
 #   ./build_processed.sh --no-upload  build and check only
+#   BUILD_NOW="YYYY-MM-DD HH:MM" ./build_processed.sh   build as of that time: the same finished days as a build
+#                                     made then (e.g. a README-only update; data files come out byte-identical)
 # Log: data_processed/build.log. Remote: gdrive:SLDS_1.3_processed unless SLDS_PROCESSED_REMOTE is set.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -31,8 +33,9 @@ echo "== $(date '+%F %T') start"
 echo "-- get_context_data.py"; nice -n 10 python3 analysis/get_context_data.py
 echo "-- test_data_steps.py"; "$PY" analysis/test_data_steps.py
 [ -f analysis/verify_data.py ] || { echo "analysis/verify_data.py is missing: nothing is uploaded"; exit 1; }
-echo "-- build_data.py"; capped "$PY" analysis/build_data.py
-echo "-- verify_data.py"; capped "$PY" analysis/verify_data.py
+NOW=(); [ -z "${BUILD_NOW:-}" ] || NOW=(--now "$BUILD_NOW")   # build and check the same days
+echo "-- build_data.py${BUILD_NOW:+ (as of $BUILD_NOW)}"; capped "$PY" analysis/build_data.py "${NOW[@]}"
+echo "-- verify_data.py"; capped "$PY" analysis/verify_data.py "${NOW[@]}"
 if [ "${1:-}" != "--no-upload" ]; then
   echo "-- upload to $REMOTE"
   # the top of the Drive folder holds only README.md, train.parquet, test.parquet and extra/ (team decision 14 Nov)

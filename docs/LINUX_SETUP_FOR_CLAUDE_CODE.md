@@ -34,12 +34,13 @@ Get the code from GitHub (https://github.com/PressGO/slds-1.3; done 16 Oct 2026)
 
 ```
 slds-1.3/
-├── README.md  AI_USE.md  PROJECT_PLAN.md  DECISIONS.md  .gitignore  check.sh
-├── requirements.txt  setup_env.bat  setup_env.sh   (notebook environment: Windows / Linux)
-├── 00_check_sources.ipynb  00_check_sources_python.ipynb  01_windows_collector_monitor.ipynb  03_visuals.ipynb  build_processed.sh
-├── analysis/   lta_collector.py  get_context_data.py  00_check_sources.R  00_check_sources.py  build_data.py  data_*.py  verify_data.py
-├── R/  report/  slides/                      (empty for now, .gitkeep)
-└── docs/       LINUX_SETUP_FOR_CLAUDE_CODE.md (this file)
+├── README.md  AI_USE.md  PROJECT_PLAN.md  DECISIONS.md  .gitignore  check.sh  build_processed.sh  upload_raw.sh
+├── requirements.txt  setup_env.bat  setup_env.sh   (Python environment: Windows / Linux)
+├── 01_windows_collector_monitor.ipynb  02_linux_collector_health.ipynb  03_visuals.ipynb
+├── analysis/   lta_collector.py  get_context_data.py  00_check_sources.py  archive_raw.py  verify_raw.py
+│               build_data.py  data_settings.py  data_steps.py  test_data_steps.py  verify_data.py
+├── report/  slides/                          (empty for now, .gitkeep)
+└── docs/       LINUX_SETUP_FOR_CLAUDE_CODE.md (this file)  data_rules.md  model_data/
 ```
 
 ```bash

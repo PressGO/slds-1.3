@@ -1,7 +1,7 @@
 """data_settings.py - every setting of the data pipeline (data version 4), in one place.
 
-Each value is a decision. Change one only after a dated entry in DECISIONS.md (and CHANGELOG.md on the
-Linux PC), then raise DATA_VERSION and add a line to DATA_CHANGES. Used by build_data.py, data_steps.py and
+Each value is a decision. Change one only after a dated entry in DECISIONS.md (and project_docs/CHANGELOG.md on
+the Linux PC), then raise DATA_VERSION and add a line to DATA_CHANGES. Used by build_data.py, data_steps.py and
 verify_data.py.
 """
 

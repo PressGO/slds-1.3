@@ -27,12 +27,6 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 
-# R
-.Rhistory
-.RData
-.Rproj.user/
-renv/library/
-
 # Old files kept on your machine only
 _superseded/
 
@@ -43,9 +37,11 @@ Thumbs.db
 desktop.ini
 .DS_Store
 
-# Kept locally, not shared: personal to-do list; working changelog of decisions (final ones also go in
-# DECISIONS.md); 16 Oct collection review (summarised in DECISIONS.md);
-# proposal workbook (draft; the repo is public). The report/ folder itself stays in Git for the final report.
+# Kept locally, never shared (the repo is public): project_docs/ holds the course documents (brief, catalog),
+# our submitted proposal, and our working notes: CHANGELOG.md (working log of decisions; final ones also go in
+# DECISIONS.md), TODO.md, the proposal workbook. The names below are a safety net in case a copy lands elsewhere.
+# The report/ folder itself stays in Git for the final report.
+project_docs/
 TODO.md
 CHANGELOG.md
 docs/COLLECTION_REVIEW_2026-10-16.md

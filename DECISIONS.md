@@ -34,6 +34,7 @@ Format: `date  topic: decision (reason; author)`
 2026-11-14  Rain station with the proposal's train days: the 80% rule (unchanged) now admits 82 of 90 stations, S35 too (it missed 80% only on 7 or 8 Nov, no longer train days), so 73 links on the PIE and AYE take their rain from S35   (follows from the split)
 2026-11-15  Plan freeze: Fri 20 Nov 2026, git tag plan-freeze (confirmed). From the tag on, the label, metrics, models, their tuned settings, calibration and k are fixed. test.parquet is shared only after the tag; until then nobody opens test-week data (14-20 Nov), including those days' raw files in SLDS_1.3_raw   (Juan Peng)
 2026-11-15  Collection end (supersedes "collect until Sun 22 Nov" in the 2026-11-14 split entry): both collectors keep running after the test week, no end date yet; never stopped before Sat 21 Nov 01:00 (the late rows of Fri 20 Nov). Data after 20 Nov is not used for the main results; the optional school-holiday stress test would use 23-27 Nov   (Juan Peng)
+2026-11-18  Software: the whole project is in Python (data build, models, report). The brief says "Note that the document mentions R, but you can use any software of choice" (§6.2 p.4), and the instructor confirmed it (answers PROJECT_PLAN §11 Q7). The R copy of the data build (R/, added 15 Nov only for the submission) and the R source check are removed from the repo. No change to the data or the method   (Juan Peng)
 ```
 
 ## Background: speed-band collection findings (16 Oct 2026)

@@ -37,6 +37,7 @@ WHAT IT CHECKS
 HOW TO RUN (it only reads; it writes nothing)
   cd /home/dev/slds-1.3 && systemd-run --user --scope -q -p MemoryMax=8G -p MemorySwapMax=1G \
       .venv/bin/python analysis/verify_data.py [--rows 3000] [--corner-rows 100] [--lodo-rows 500] [--workers 8]
+      [--now "YYYY-MM-DD HH:MM"]   (only to check a build made with the same --now: an earlier state, same days)
   It takes about 5 minutes and under 4 GB of memory. The last line is "VERIFY: OK (...)" (exit code 0) or
   "VERIFY: FAILED (...)" (exit code 1). Above it: mismatches per column with up to 3 examples, what the
   sample covered, every other check, notes, and the working (my values and the raw rows) for the first
@@ -1223,6 +1224,8 @@ def main():
                     help="extra rows per corner case of rules 14 and 15 (default 100; 0 = none)")
     ap.add_argument("--lodo-rows", type=int, default=500, help="rows to sample from train_lodo (default 500)")
     ap.add_argument("--workers", type=int, default=8, help="threads that read files (default 8)")
+    ap.add_argument("--now", help="rule 18 as of this time, 'YYYY-MM-DD HH:MM' (default: the clock); use the same "
+                                  "--now as build_data.py when it rebuilt an earlier state")
     args = ap.parse_args()
     rng = random.Random(SEED)
     checks, notes = [], []
@@ -1474,7 +1477,7 @@ def main():
         checks.append(check_road_flags(lf, name, road_of, held_links))
     checks.append(check_rain_totals(full_files() + [LODO]))
     # rule 18: day D is finished when the rainfall table has its 23:55 readings and it is D+1 02:00
-    now = datetime.now()
+    now = datetime.strptime(args.now, "%Y-%m-%d %H:%M") if args.now else datetime.now()
     rain_2355 = {t.date() for rd in readings.values() for t in rd if t.hour == 23 and t.minute == 55}
     finished = [d for d in all_days + [last_day + timedelta(days=k) for k in range(1, 15)]
                 if d in rain_2355 and now >= datetime.combine(d + timedelta(days=1), time(0, 0)) + FINISHED_AFTER

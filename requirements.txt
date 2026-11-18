@@ -1,7 +1,11 @@
-# SLDS 42.510 project 1.3: Python packages for the notebooks.
+# SLDS 42.510 project 1.3: Python packages for the notebooks, the data build and the models.
 # The collector (lta_collector.py) and get_context_data.py use only the standard library.
-polars>=1.0,<2   # notebooks were written and tested on polars 1.x
+# The exact versions behind each data build are in its extra/build_info.json ("software").
+polars>=1.0,<2   # the data build and the notebooks were written and tested on polars 1.x
 numpy>=1.24
 matplotlib>=3.7
 ipykernel>=6.0
 jupyterlab>=4.0
+pandas>=2.0      # models: reading the parquet tables (pandas needs pyarrow for that)
+pyarrow>=14
+scikit-learn>=1.3

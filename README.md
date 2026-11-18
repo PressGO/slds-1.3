@@ -3,7 +3,7 @@
 42.510 Statistical Learning for Data Science (SUTD, 2026), catalog topic 1.3.
 Team: Aveline, Liam, Juan Peng, Ronnie
 
-Status, 14 Nov 2026: the instructor has approved our proposal. LTA traffic data collected 24/7 since 14 Oct 2026 (desktop until 16 Oct; since then two collectors with two keys on the Linux mini PC, see `DECISIONS.md`). The model tables (data version 4: weekdays only, AYE and CTE held out, as in our proposal) are on Google Drive: see "Getting the modelling data".
+Status, 18 Nov 2026: the instructor has approved our proposal. The whole project is in Python (the brief allows any software, §6.2). LTA traffic data collected 24/7 since 14 Oct 2026 (desktop until 16 Oct; since then two collectors with two keys on the Linux mini PC, see `DECISIONS.md`). The model tables (data version 4: weekdays only, AYE and CTE held out) are on Google Drive: see "Getting the modelling data".
 
 ## Files
 
@@ -23,23 +23,23 @@ Status, 14 Nov 2026: the instructor has approved our proposal. LTA traffic data 
 | `analysis/data_steps.py` | The steps of the pipeline as small functions (tables in, tables out): cleaning, registry, neighbours, joining roads, normal level, labels, inputs, incidents | Used by `build_data.py` |
 | `analysis/test_data_steps.py` | Tests every step on small made-up data with answers worked out by hand | `.venv/bin/python analysis/test_data_steps.py -v` |
 | `analysis/verify_data.py` | Independent check: recomputes sample rows of the finished tables straight from the raw files, written from the rules only (not from the pipeline code) | Via `build_processed.sh` |
-| `R/build_data.R`, `R/data_steps.R`, `R/data_settings.R` | The same build in R, for the submission: reads the same raw files and writes the same tables to `data_processed/model_r/` (never uploaded; the Python build makes the team's data). `R/compare_with_python.R` checks that every value equals the Python tables. See `R/README.md` | `Rscript R/build_data.R`, then `Rscript R/compare_with_python.R` |
-| `build_processed.sh` | Rainfall download, tests, `build_data.py` (memory capped at 14 GB so the collectors are safe), `verify_data.py`, then copies `data_processed/model/` to the Google Drive folder `SLDS_1.3_processed` (test files only with `SHARE_TEST=1`). Stops at the first failure. Log: `data_processed/build.log` | `./build_processed.sh` (or `--no-upload`) |
+| `build_processed.sh` | Rainfall download, tests, `build_data.py` (memory capped at 14 GB so the collectors are safe), `verify_data.py`, then copies `data_processed/model/` to the Google Drive folder `SLDS_1.3_processed` (test files only with `SHARE_TEST=1`). Stops at the first failure. `BUILD_NOW="YYYY-MM-DD HH:MM"` rebuilds an earlier state (the same days). Log: `data_processed/build.log` | `./build_processed.sh` (or `--no-upload`) |
 | `03_visuals.ipynb` | Maps, time–space diagrams, share of links by speed band | Cell 1, then any plot cell |
-| `analysis/00_check_sources.R`, `00_check_sources.ipynb` | One-off check of every source (run 13 Oct 2026: 315 requests, 0 failed) | Done |
-| `analysis/00_check_sources.py`, `00_check_sources_python.ipynb` | The same check in Python (standard library only); same outputs in `data_raw/source_check/` (run 16 Oct 2026: 315 requests, 0 failed) | `python3 analysis/00_check_sources.py`, or the notebook |
+| `analysis/00_check_sources.py` | One-off check of every source (standard library only); outputs in `data_raw/source_check/`. Run 13 Oct 2026 (first version, in R) and 16 Oct 2026: 315 requests, 0 failed both times | `python3 analysis/00_check_sources.py` (done) |
 | `DECISIONS.md` | Dated, frozen design and collection decisions (append only), and the background to the 16 Oct collection change: LTA's rate limit and out-of-sync pages | Read before changing anything |
 | `docs/LINUX_SETUP_FOR_CLAUDE_CODE.md` | Step-by-step setup of both collectors on the Linux PC | Once per machine |
-| `setup_env.bat` (Windows), `setup_env.sh` (Linux), `requirements.txt` | Creates `.venv` with polars, numpy, matplotlib and Jupyter, and the kernel "Python (SLDS 1.3)" | Once per machine |
+| `setup_env.bat` (Windows), `setup_env.sh` (Linux), `requirements.txt` | Creates `.venv` with polars, numpy, matplotlib, Jupyter, pandas, pyarrow and scikit-learn, and the kernel "Python (SLDS 1.3)" | Once per machine |
 
 The notebooks sit in the project folder because they use it as their working directory.
 
-Planned: the modelling scripts in R (baselines, elastic net, random forest), reading `data_processed/model/train.parquet`.
+Planned: the team's model scripts in Python (baselines, penalised logistic regression, random forest), reading `data_processed/model/train.parquet`.
+
+Not in git: `project_docs/` on the Linux PC (the course brief and catalog, our submitted proposal, and our working notes such as the changelog).
 
 ## Setup on a new machine
 
-1. Install Python 3.10 or newer, then run `setup_env.bat` (Windows) or `./setup_env.sh` (Linux). This is only needed for the notebooks; the collector needs no packages.
-2. Create `.Renviron` in the project folder. It is excluded by `.gitignore`; never commit it or paste its contents anywhere.
+1. Install Python 3.10 or newer, then run `setup_env.bat` (Windows) or `./setup_env.sh` (Linux). This is needed for the notebooks, the data build and the models; the collector needs no packages.
+2. Create `.Renviron` in the project folder (the name comes from R; our Python scripts read it). It is excluded by `.gitignore`; never commit it or paste its contents anywhere.
 
    ```
    LTA_ACCOUNT_KEY=<LTA DataMall key>
@@ -83,7 +83,7 @@ The desktop's 14-16 Oct data is not uploaded (team decision, 24 Oct): it is most
 The tables for the models are in the Google Drive folder `SLDS_1.3_processed` (Viewer), rebuilt with `./build_processed.sh` on the Linux PC.
 
 ```
-README.md        what every column means, the rules, R quick start (also in docs/model_data/README.md)
+README.md        what every column means, the rules, Python quick start (also in docs/model_data/README.md)
 train.parquet    the rows to train on (Mon-Fri, no public holidays); split = "train" (fit, tune) or "validate"
                  (choose, calibrate); heldout_road = TRUE for AYE and CTE (only for the transfer check)
 test.parquet     the test week, added after it ends and the plan is frozen

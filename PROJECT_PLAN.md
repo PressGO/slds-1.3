@@ -1,6 +1,6 @@
 # Project 1.3 plan: recurring vs unusual congestion
 
-42.510 Statistical Learning for Data Science · Team: [team name] · Version 3, Sun 15 Nov 2026 (v2: 14 Oct; v1: 13 Oct)
+42.510 Statistical Learning for Data Science · Team: [team name] · Version 4, Wed 18 Nov 2026: Python only (v3: 15 Nov; v2: 14 Oct; v1: 13 Oct)
 Prepared by the project lead (drafted with Claude; logged in `AI_USE.md`)
 
 **How to read this file**
@@ -66,7 +66,7 @@ The proposal is worth 5 of the 30 points, and "full score is given if all the ch
 |---|---|---|
 | Team | At most 4 members, assigned. Every member contributes to question formulation, data work, analysis and communication. Every member speaks and may be asked any question | Brief §2 p.1 |
 | Proposal | 5 pts. Due 17 Oct (Sat), 23:59. Max one A4 page, 12-pt font. 8 checkpoints. "The project must be approved before substantial work begins" | Brief §6.1 p.3, §7.1 p.5, §10 p.6 |
-| Analysis package | `README.md`, `data_raw/` or `get_data.R`, `data_processed/` (if redistribution is allowed), `R/`, `analysis/`, `figures/`, `report/`, `slides/`, `AI_USE.md`. Must run from raw data to final outputs "without undocumented manual steps" | Brief §6.2 p.4 |
+| Analysis package | `README.md`, `data_raw/` or `get_data.R`, `data_processed/` (if redistribution is allowed), `R/`, `analysis/`, `figures/`, `report/`, `slides/`, `AI_USE.md`. Must run from raw data to final outputs "without undocumented manual steps". The brief adds: "Note that the document mentions R, but you can use any software of choice." We use Python throughout (18 Nov), so there is no `R/` folder | Brief §6.2 p.4 |
 | Final report | 10 pts. Due 6 Dec (Sun), 23:59. Main text ≤ 6 A4 pages at 11 or 12 pt, not counting references and a concise technical appendix. The appendix "is not a way to move essential reasoning out of the graded report". 8 required sections | Brief §6.3 p.4, §10 p.6 |
 | Presentation and defence | 15 pts. In class, 7–13 Dec. 20–25 min per team: a 12–15 min talk, then Q&A | Brief §6.4 p.4, §10 p.6 |
 | Scoring | Members normally get the same report score. Presentation and defence scores can differ "when individual understanding or contribution is demonstrably uneven" | Brief §2 p.1 |
@@ -259,11 +259,11 @@ Why this framing:
 | B1: time-of-week rate | Baseline | What "knowing rush hour" alone achieves: the training-week rate of `U` for each link × slot | Required by the catalog |
 | B2: persistence | Baseline | Last observation: score = current deficit `d(l,t)` | Required by the catalog. Expect it to be strong overall and weak on onsets |
 | Norm (stage 1) | Segment-level profile model | Defines what "recurring" means | Median by slot. A smooth regression of expected band is the alternative; be ready to discuss the bias–variance trade-off between them |
-| M1: elastic-net logistic regression | Logistic regression + regularisation | Interpretation; handles many correlated lags | `glmnet`. Standardise using training statistics. Tune λ and α by forward-chaining CV within the training weeks. Check coefficient stability with a bootstrap |
-| M2: random forest | CART / random forests | Nonlinear benchmark, e.g. rain × peak × road type | `ranger`. Tune `mtry` and `min.node.size` with the same CV. Use permutation importance on the validation week. Calibrate on the validation week |
+| M1: elastic-net logistic regression | Logistic regression + regularisation | Interpretation; handles many correlated lags | Python (e.g. scikit-learn). Standardise using training statistics. Tune λ and α by forward-chaining CV within the training weeks. Check coefficient stability with a bootstrap |
+| M2: random forest | CART / random forests | Nonlinear benchmark, e.g. rain × peak × road type | Python (e.g. scikit-learn). Tune the number of inputs tried at each split and the minimum leaf size (`max_features`, `min_samples_leaf`) with the same CV. Use permutation importance on the validation week. Calibrate on the validation week |
 | M3 (stretch): clustering of daily profiles, with PCA first if needed | Clustering, PCA | Segmentation for error analysis and transfer | Only once Tiers 1–2 (§6.2) are done |
 
-If the training set is too big for `ranger`, subsample the negatives with a fixed seed and recalibrate probabilities on the validation week afterwards, because subsampling distorts the probabilities.
+If the training set is too big for the random forest, subsample the negatives with a fixed seed and recalibrate probabilities on the validation week afterwards, because subsampling distorts the probabilities.
 
 ### 4.7 Metrics (fixed before modelling) [Brief §4 p.3]
 
@@ -314,6 +314,8 @@ If the training set is too big for `ranger`, subsample the negatives with a fixe
 - Page check: the draft below fits one A4 page at 12 pt with 2 cm margins, even in a wide font (DejaVu Serif), with a few lines to spare. Filling in the brackets won't change that much, but check the exported PDF anyway.
 
 ### 5.2 Draft to adapt (fill in the [brackets])
+
+The proposal we submitted is in `project_docs/` (local only, not in git). It is not word for word this draft; the differences are being reviewed (18 Nov).
 
 <!-- proposal-start -->
 
@@ -381,11 +383,11 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
 3. **Daily health check (2 minutes, data lead).** `~/slds-1.3/check.sh` on the mini PC (both collectors: heartbeat, files today, last hour's fetches, errors, disk), or monitor notebook cell 5 on the desktop. Post one line in the team chat.
 4. **Backups.** Since 16 Oct both collectors run on the Linux mini PC (two keys, §6.3); the desktop holds 14–16 Oct and is a cold spare. Copy `data_raw/` and `data_raw_expressway/` to an external drive or a team-only cloud folder at least weekly from 21 Oct. (24 Oct: replaced by the nightly Google Drive upload, `upload_raw.sh`; see `DECISIONS.md`.)
 5. **Pre-registration in `DECISIONS.md`.** Every frozen choice gets a date, a reason and an author. Changes are appended, never edited in place. This is our evidence that the outcome and metric were defined before models were compared [Brief §4 p.3].
-6. **One `config.yml`** (for the R modelling stage) holding dates, thresholds, horizon, *k*, seeds, paths and the API endpoint. Sensitivity runs and any changes the instructor asks for then become config edits, not code rewrites.
-7. **Test lock.** Test-week rows go to a separate file that only `90_final_test.R` reads. EDA and tuning scripts stop with an error if they ever see a date after 13 Nov.
+6. **One settings file for the modelling stage** (like `analysis/data_settings.py` for the data) holding dates, thresholds, horizon, *k*, seeds and paths. Sensitivity runs and any changes the instructor asks for then become config edits, not code rewrites.
+7. **Test lock.** Test-week rows go to a separate file (`test.parquet`) that only the final test script reads. EDA and tuning scripts stop with an error if they ever see a date after 13 Nov.
 8. **Reproducibility.**
-   - An `renv` lockfile for R; a `requirements.txt` (polars, numpy, matplotlib) for the Python notebooks. The collector and context script use only the Python standard library.
-   - `run_all.R` runs every script in order, and seeds are set.
+   - `requirements.txt` for the Python environment; the exact versions behind each data build are in its `build_info.json`. The collector and context script use only the Python standard library.
+   - One run-all script runs every step in order, and seeds are set.
    - Figures are saved by code only.
    - Before submission, a member who didn't write the pipeline reruns everything from a clean clone [Brief §6.2 p.4].
 9. **Write as we go.** Start the 8-section `report.qmd` skeleton now. Each workstream drafts its section as soon as its work is done. Update the data dictionary whenever a variable is added.
@@ -421,7 +423,7 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
 
 ## 7. Data sources
 
-Source checks: `00_check_sources.ipynb` (R, run 13 Oct) and `00_check_sources_python.ipynb` (Python, run 16 Oct); both 315 requests, 0 failed. Collection decisions and LTA's feed behaviour: `DECISIONS.md` (16 Oct entries and background).
+Source checks: run 13 Oct (first version, in R; removed 18 Nov) and 16 Oct (`analysis/00_check_sources.py`); both 315 requests, 0 failed. Collection decisions and LTA's feed behaviour: `DECISIONS.md` (16 Oct entries and background).
 
 | Dataset | Role | How we get it | Key? | Status |
 |---|---|---|---|---|
@@ -455,7 +457,7 @@ Source checks: `00_check_sources.ipynb` (R, run 13 Oct) and `00_check_sources_py
 | Sat 7 Nov | Norms frozen from the training weeks; training panel built | Labels lead |
 | Sun 15 – Fri 20 Nov | Fit and tune with forward-chaining CV inside the training weeks (data version 4, on Drive since 15 Nov); then the validation-week evaluation, final model choice, *k* and calibration. All before the freeze | Models leads |
 | Fri 20 Nov | **Plan freeze** (date confirmed 15 Nov): git tag `plan-freeze` before any test-week analysis. Commit the model scripts and the chosen settings first. Until the tag, nobody opens test-week data, including the raw files of 14–20 Nov on Drive | Lead |
-| Sat 21 – Sun 22 Nov | Run `90_final_test.R` once and record every result, including negative ones | Models lead |
+| Sat 21 – Sun 22 Nov | Run the final test script once and record every result, including negative ones | Models lead |
 | 23–29 Nov | Diagnostics, sensitivity, transfer, figures. Optional school-holiday stress test (needs collection to 27 Nov) | All |
 | Mon 30 Nov | Full report draft | Report lead |
 | Tue 1 – Sat 5 Dec | Cut to 6 pages; clean-clone rerun by a non-author; slides; two timed rehearsals and a mock defence | All |
@@ -525,7 +527,7 @@ The documents leave these open:
 4. The brief requires "a frozen raw-data snapshot or a script that recreates it" [Brief §3.2 p.2], and says "Large raw files need not be submitted if the retrieval instructions are reliable" [Brief §6.2 p.4]. No script can re-download past snapshots. Would a shared-drive link with checksums be acceptable?
 5. AI use is "subject to course and university policy" [Brief §5 p.3]. Which tools are authorised?
 6. How and where should the proposal be submitted, and in what format?
-7. The package layout assumes R [Brief §6.2 p.4]. Is it acceptable to collect and process the data with Python scripts, with all statistical analysis in R?
+7. The package layout assumes R [Brief §6.2 p.4]. Is it acceptable to collect and process the data with Python scripts, with all statistical analysis in R? **Answered:** the brief now says "Note that the document mentions R, but you can use any software of choice" [Brief §6.2 p.4], and the instructor confirmed it. Everything is in Python (18 Nov).
 
 Email template (send tonight):
 
@@ -565,22 +567,23 @@ slds-1.3-congestion/
 ├── analysis/
 │   ├── lta_collector.py       24/7 LTA collector (Python standard library)
 │   ├── get_context_data.py    NEA rainfall + calendar (MOM, MOE, F1)
-│   ├── 00_check_sources.R     one-off source check (done 13 Oct)
-│   ├── 00_check_sources.py    the same check in Python (done 16 Oct)
-│   └── (R modelling scripts: 05_labels.R, 06_models.R, 07_validate.R, 90_final_test.R, run_all.R)
+│   ├── 00_check_sources.py    one-off source check (done 13 and 16 Oct)
+│   ├── build_data.py, data_settings.py, data_steps.py   raw files → model tables
+│   ├── test_data_steps.py, verify_data.py               tests and the independent check
+│   └── (the team's model scripts, in Python)
 ├── data_raw/                  whole-network collector output; large, not in GitHub
 ├── data_raw_expressway/       expressway collector output; not in GitHub
-├── data_processed/            Parquet tables for R (arrow::open_dataset)
-├── R/                         R functions: norms, features, metrics
+├── data_processed/            Parquet tables (pandas or polars)
 ├── figures/                   produced by code only
 ├── report/                    report.qmd → PDF
 ├── slides/                    slides source → PDF
-└── docs/                      Linux setup, LTA API guide, course PDFs, defence.md
+├── docs/                      Linux setup, data rules, model-data build record, defence.md
+└── project_docs/              local only, not in GitHub: course PDFs, our submitted proposal, working notes
 ```
 
-Superseded and not to be used: `collect.py`, `01_collect.R`, `collector_setup_py.ipynb`, `01_collector_setup.ipynb`, `02_map_speedbands.R`.
+Superseded and not to be used: `collect.py`, `01_collect.R`, `collector_setup_py.ipynb`, `01_collector_setup.ipynb`, `02_map_speedbands.R`, and (18 Nov) the R copy of the data build.
 
-Python packages for the notebooks: `polars`, `numpy`, `matplotlib`. R packages for modelling: `arrow`, `dplyr` or `data.table`, `glmnet`, `ranger`, `PRROC` or `yardstick`, `ggplot2`, `renv`, `quarto`.
+Python packages: `polars`, `numpy`, `matplotlib` (data build and notebooks); `pandas`, `pyarrow`, `scikit-learn` (models). Quarto runs Python too, for the report.
 
 First entries for `DECISIONS.md`:
 
