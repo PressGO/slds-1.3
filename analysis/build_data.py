@@ -703,7 +703,7 @@ def readme(info: dict, days: pl.DataFrame) -> str:
         a, b = S.SPLITS[s]
         d = days.filter((pl.col("split") == s) & pl.col("in_population"))
         use_for = {"train": "fit and tune the models; the normal level comes from these days only",
-                   "validate": "choose the final model, calibrate, set the alert budget k",
+                   "validate": "choose the final model, calibrate, set the alert budget",
                    "test": "final test, once, after the plan is frozen"}[s]
         all_d = days.filter(pl.col("split") == s)
         so_far = "" if all_d.height and all_d["date"].max() == b else " (not finished yet)"
@@ -817,8 +817,10 @@ y:                                                      |         low    low
 - **`U`** (unusual now) = low now and 5 minutes ago. `U` is unknown when either update is missing; those rows
   are not in `train.parquet`.
 - **`y`** (the answer) = `U` 15 minutes later. In `train`, {pct(ls['train']['share_y'])} of rows are True.
-- **Main score**: PR-AUC on the rows that are normal now (`U == False`), in the test week. On those rows only
-  {pct(ls['train']['share_y_onset'])} (train) and {pct(val.get('share_y_onset'))} (validate) become unusual. That is also the PR-AUC of a model that guesses.
+- **Main score**: PR-AUC on the rows that are normal now (`U == False`) in the test week, on the training roads
+  (`heldout_road == False`). AYE and CTE get a score of their own (the transfer check). Of the rows that are normal
+  now, {pct(ls['train']['share_y_onset'])} (train) and {pct(val.get('share_y_onset'))} (validate) become unusual 15 minutes later (all roads together).
+  That share is also the PR-AUC of a model that only guesses.
 
 ## The inputs (`f_` columns, all known at time `t`)
 
@@ -839,7 +841,7 @@ y:                                                      |         low    low
 | `f_conn_in_none`, `f_conn_out_none` | 1 = no such road (values then 0) |
 | `f_conn_in_missing`, `f_conn_out_missing` | 1 = a road exists but a value was missing (then 0) |
 
-The `f_conn_` inputs are extra: train every model with and without them (`x` and `x0` above), on the same rows.
+The `f_conn_` inputs are extra: train every model with and without them (`inputs` and `inputs0` above), on the same rows.
 
 Other columns: `LinkID`, `road`, `heldout_road`, `t` (Singapore time), `date`, `daytype` (always `weekday`
 here), `split`, `y`, `U`. Rows are in the order split, link, time.
@@ -851,11 +853,13 @@ here), `split`, `y`, `U`. Rows are in the order split, link, time.
 - Fit on `split == "train"`. Tune by forward-chaining inside the train days: fit on earlier days, check on
   later days, never the other way round. For example, with whole weeks: fit on 16-23 Oct and check on 26-30 Oct;
   then fit on 16-30 Oct and check on 2-6 Nov. Use `split == "validate"` to choose the final model, calibrate and
-  set the alert budget *k*. Do not open `test.parquet` before the plan is frozen.
+  set the alert budget (the share of links to alert on at each update). Do not open `test.parquet` before the plan
+  is frozen.
 - Do not take "the row above" as the previous update. Use `f_d5`, `f_d10`, ...
-- Set a random seed. For the logistic regression, scale the inputs with the mean and standard deviation of the
+- Set a random seed. For the lasso logistic regression, scale the inputs with the mean and standard deviation of the
   rows you fit on, and treat `f_slot15` as a curve or as hour groups, not a straight line. For the random forest
-  on all rows, you may keep fewer False rows (fixed seed) and then calibrate on `validate`.
+  on all rows, you may keep fewer False rows (fixed seed) and then calibrate on `validate` (calibrate = adjust the
+  predicted chances so that they match how often slowdowns really happen).
 - Write the data version ({info['data_version']}) next to every result.
 
 ## Good to know

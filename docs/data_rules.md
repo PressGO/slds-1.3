@@ -104,3 +104,74 @@ All times are Singapore local time without a zone. "5 min" steps: LTA updates ev
     roads) is the median over the train days of that day type EXCEPT d (rules 6 and 15 with day d left out).
     Everything else (rules 7-19) is the same, computed with that normal level. It holds the rows with use ==
     TRUE of those days under that rule.
+
+## Added on 18 Nov 2026: built after the test build (not in data version 4 yet)
+
+Fixed before the plan freeze (`DECISIONS.md`, 18 Nov). Nothing here changes rules 1-22 or any existing column.
+
+### Incident information columns (only to interpret events, never an input)
+
+23. **Incidents**: the episodes in `extra/incidents.parquet` of the same build (made from the saved incident snapshots
+    in the folders up to the build's last finished day). One row is one episode, not one unique incident: when an
+    incident leaves the feed and comes back, or its message changes, that is a new episode; never merge or count them.
+    Used: `type`, `lat`, `lon`, `first_seen` (the retrieval time of our first saved snapshot that lists it),
+    `last_seen_before` (the retrieval time of our first later snapshot without it; null when it is still listed in
+    the last snapshot read) and `reported` (the time at the start of LTA's message: minute precision, year taken
+    from `first_seen`; used as stored). All are Singapore local times and are compared exactly (with seconds).
+    An episode is **listed at** time s when first_seen <= s and (last_seen_before is null or s < last_seen_before).
+    Its **start** is `reported` when known, else `first_seen`. Rule 25 uses every snapshot of the build, also those
+    after t: the columns are information only, never an input.
+24. **Distance** from an episode to a link: the shortest distance in metres from the episode's point (x from `lon`,
+    y from `lat`) to the line segment from the link's start point (StartLon, StartLat) to its end point (EndLon,
+    EndLat), clamped at both end points, on the flat grid of rule 13. **Within** d m means a distance <= d.
+    Incidents carry no direction, so one episode can match the links of both carriageways.
+25. **Columns** in `extra/full_table.parquet` and `extra/test_full.parquet`, for every row (link l, time t), also the
+    rows with `use` = False and the rows on Saturdays, Sundays and public holidays:
+    - `info_inc_100m`: the type of an episode listed at t within 100 m of l;
+    - `info_inc_1km`: the type of an episode listed at t within 1,000 m of l;
+    - `info_inc_next15_1km`: the type of an episode within 1,000 m of l whose start is after t and at most
+      t + 15 min (start > t and start <= t + 15 min). It began inside the prediction window, so no incident report
+      could have warned of it at t.
+    When several episodes qualify, the type is the first of: Accident, Vehicle breakdown, Obstacle, Unattended
+    Vehicle, Road Block, Roadwork, Miscellaneous, Heavy Traffic (these exact, case-sensitive names), then any other
+    type in alphabetical order. The columns are text, and null (never an empty string) when no episode qualifies.
+    They are never in train.parquet, test.parquet or train_lodo.parquet.
+
+### 1 km segments (the secondary analysis fixed in our proposal)
+
+26. **Paths** (stretches of one carriageway between splits and merges): expressway link A **continues into** link B
+    when B is downstream of A (rule 13), A and B have the same `road` (rule 20: the `road` column of
+    `extra/links.parquet`), B is A's only downstream link on that road, and A is B's only upstream link on that road
+    (downstream and upstream links on other roads do not count). A path is a longest chain of links in which each
+    link continues into the next, so paths break at every split and merge, and every link is on exactly one path (a
+    link that neither continues nor is continued is a path of its own). A path's id is the LinkID of its first link
+    (the link that no other link continues into); a chain that closes on itself starts at its smallest LinkID in
+    text order.
+27. **Segments**: a link's length is the Euclidean distance in metres from its start point to its end point on the
+    flat grid of rule 13, unrounded in every test below (rounded only in the output files). Walk each path from its
+    first link: a link belongs to segment number floor(s / 1000), where s is the summed length of the links before it
+    on the path, so a link goes by where it starts and is never split. When a path has more than one segment and its
+    last one is shorter than 500 m (strictly), that last segment joins the one before it. A path with one segment
+    keeps it, however short. Segment id: `<path id>-<number>` (numbers from 0). A segment's length is the summed
+    length of its links; its midpoint is the length-weighted mean of its links' midpoints, in degrees (lat and lon
+    averaged separately; a link's midpoint as in rule 16).
+28. **Segment band** at time t: the length-weighted mean of the bands (rule 1) of the segment's links that have a band
+    at t, when those links make up at least 80% of the segment's length; otherwise unknown. Only captured bands count,
+    never a reused value.
+29. **Segment normal level, drop, low, U, y**: rules 3-10 with the segment band in place of the link band. The normal
+    level is the median segment band over the train days of that day type and 15-min slot; drop = normal level -
+    segment band; low = drop >= 2; U = low at t and at t - 5 min; y = U at t + 15 min (also y_h5, y_h10, y_h30).
+30. **Segment inputs** (all known at t): `f_d0` ... `f_d30`, `f_d_change15` and `f_n_filled` from the segment's drops
+    (rules 11-12); `f_up_*`, `f_dn_*` and the two `_none` flags from neighbouring segments as in rule 14, where segment
+    B is downstream of segment A when some link of A has a downstream link (rule 13) in B, and B is not A;
+    `f_rain15`, `f_rain30` and their `_missing` flags from the station nearest the segment's midpoint, chosen as in
+    rule 16; `f_slot15` and `f_mon` ... `f_fri` (rule 17). No joining-road inputs.
+31. **Segment rows**: every segment x every t from 06:00 to 21:55 on the population days (rule 4a) of the splits;
+    `split` by the date of t (rule 4); `road` and `heldout_road` of its links (all links of a path share one road);
+    `use` = y and U known and every input of rule 30 known.
+32. **Segment files** in `data_processed/model/extra/`: `segments.parquet` (one row per segment: segment_id, path_id,
+    number, road, heldout_road, n_links, length_m, mid_lat, mid_lon, station_id, station_km); `segment_links.parquet`
+    (one row per link: LinkID, segment_id, position on the path, length_m); `seg_train.parquet` (the use rows of the
+    train and validate days: segment_id, road, heldout_road, t, date, split, y, U and the inputs of rule 30);
+    `seg_test.parquet` (the same for the test days, shared only after the plan freeze, like test.parquet). Lengths
+    are rounded to 2 decimals and station_km to 3.

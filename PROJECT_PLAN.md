@@ -139,7 +139,7 @@ Full marks need all 8 checkpoints covered plus instructor approval. See §5. The
 |---|---|---|---|
 | Question, relevance and scope | 2.0 | Precise, important, answerable question; audience and decision explicit; claims match the study design | One-sentence question (§4.1); operations-centre decision with an alert budget; "predicts" and "is associated with", never "causes" |
 | Data curation and provenance | 1.5 | Reproducible acquisition and construction; correct unit; thoughtful quality checks; dictionary, licence and limitations documented | Raw API archive with request logs; link registry; link × 5-min unit; gap and LinkID-change reports; data dictionary; licence notice |
-| Methods and validation | 2.5 | Suitable baseline and competing course tools; choices justified; leakage avoided; tuning and evaluation match intended use | Two catalog baselines, elastic-net logistic regression and a random forest; norms frozen on training weeks; forward-in-time tuning; untouched test week; held-out roads |
+| Methods and validation | 2.5 | Suitable baseline and competing course tools; choices justified; leakage avoided; tuning and evaluation match intended use | Two catalog baselines, lasso logistic regression and a random forest; norms frozen on training weeks; forward-in-time tuning; untouched test week; held-out roads |
 | Results, interpretation and limitations | 2.5 | Honest out-of-sample evidence; uncertainty and diagnostics; substantive interpretation; failure cases and limitations discussed | Test-week PR-AUC with day-bootstrap intervals against both baselines; calibration; errors by road type, hour and rain; one failure case; sensitivity table |
 | Writing, visuals and reproducibility | 1.5 | Concise structure; legible figures and tables; sources cited; code reproduces outputs; contributions and AI use disclosed | 8-section Quarto report; every figure made by code; a non-author reruns everything from a clean clone; `CONTRIBUTIONS.md`; `AI_USE.md` |
 
@@ -198,6 +198,8 @@ Everything in this section is a **Decision**. It is fixed now so that the outcom
 
 **15 Nov:** this section matches the approved proposal and data version 4 of the model tables. On 14 Nov we briefly added weekends and dropped the held-out roads (data version 3), then went back to the proposal the same day. Every change since 14 Oct is dated in `DECISIONS.md`.
 
+**18 Nov:** checked again, this time against the proposal we actually submitted (in `project_docs/`, local only; the draft in §5.2 differs from it). Seven decisions of 18 Nov follow from it: lasso (not elastic net), weekdays only, incidents only to interpret events, 1 km segments as a secondary analysis, the list of secondary checks, the rows of the main score, and the two baselines. They are in `DECISIONS.md` and in the sections below.
+
 ### 4.1 Question
 
 > For traffic-operations staff, can speed bands observed up to time *t* on a road segment and its neighbours, together with recent rainfall and calendar information, predict whether that segment will be in an unusual low-speed state 15 minutes later, for Singapore expressway segments on weekdays between 13 Oct and 20 Nov 2026?
@@ -207,7 +209,7 @@ Why this framing:
 - **"Distinguish recurring from unusual" becomes a definition.** Unusual means well below the segment's own time-of-week norm. The norm absorbs recurring peak congestion, so a model can't score well just by rediscovering rush hour.
 - **The learning problem is "early enough".** Spotting an unusual state *now* is just a comparison with the norm, not something to learn. What a model has to learn is the state 15 minutes ahead, and above all the **onsets**: segments that are normal now and unusual 15 minutes later.
 - **The decision maker is an operations centre.** Staff can check cameras, dispatch recovery vehicles or update road signs, but can only follow up a few alerts at once. So **precision at a fixed alert budget** is the decision-relevant metric. Travellers making route choices are a secondary audience, since navigation apps already show live speeds.
-- **Why 15 minutes:** it leaves time to verify and act. We also run 5, 10 and 30 minutes as a sensitivity check.
+- **Why 15 minutes:** it leaves time to verify and act. We also run 5, 10 and 30 minutes as a sensitivity check (5 minutes is a secondary analysis fixed in our proposal).
 
 ### 4.2 Unit, outcome and labels
 
@@ -216,7 +218,7 @@ Why this framing:
 - **Band deficit:** `d(l,t) = norm(l, daytype, slot) − band(l,t)`.
 - **Unusual state:** `U(l,t) = 1` if `d ≥ 2` at both *t* and *t − 5 min*, i.e. two consecutive snapshots.
 - **Outcome:** `Y(l,t) = U(l, t + 15 min)`. **Onset rows** are rows with `U(l,t) = 0`.
-- **Why 2 bands for 2 snapshots:** a 1-band change happens whenever speed crosses a band edge, so it's mostly noise, and one-snapshot dips flicker. Sensitivity checks: 1 band for 3 snapshots, and a rolling 21-day norm instead of the frozen one.
+- **Why 2 bands for 2 snapshots:** a 1-band change happens whenever speed crosses a band edge, so it's mostly noise, and one-snapshot dips flicker. Optional check (18 Nov): 1 band for 3 snapshots; if it is run, it is reported whatever it shows. The rolling 21-day norm was dropped on 18 Nov (the leave-own-day-out norm covers the main worry).
 - **Known limitation, the floor effect:** where the norm is already band 1–2 at peak, a 2-band drop is impossible. Unusual events inside heavy recurring congestion are therefore invisible to this label. We say so in the report.
 
 ### 4.3 Population and selection rule (coded, never hand-picked)
@@ -235,7 +237,7 @@ Why this framing:
 | Train | Tue 13 Oct – Fri 6 Nov; our data starts Fri 16 Oct (11:10) | 16 (12 Mon–Thu, 4 Fri) | Norms, model fitting, cross-validated tuning |
 | Validation | Sat 7 – Fri 13 Nov | 4 (Mon 9 Nov is a public holiday) | Model selection, calibration, alert threshold |
 | Test | Sat 14 – Fri 20 Nov | 5 | Used once, after the plan freeze |
-| Transfer | AYE and CTE (689 links, column `heldout_road`), drawn at random with seed 20261113 on 11 Nov, before any model | Same weeks | Never used in training or tuning; evaluated on the test week |
+| Transfer | AYE and CTE (689 links, column `heldout_road`), drawn at random with seed 20261113 on 11 Nov, before any model | Same weeks | Never used in training or tuning; evaluated on the test week, separately from the main score (18 Nov) |
 
 - **School calendar:** Term 4 ends Fri 20 Nov and the school holidays start Sat 21 Nov, so the window stays in term time. Schools used as O-Level venues end term on Fri 23 Oct. In EDA, compare weekday peak profiles before and after 23 Oct. If they shift, the rolling-norm sensitivity check becomes important.
 - **Sample size:** 2,598 links × 25 weekdays × 192 snapshots = about **12.5 M rows** (14.0 M with the 28 weekdays of the proposal; our data starts 16 Oct). Usable rows in `train.parquet` (data version 4): 6.40 M train and 1.65 M validation.
@@ -249,17 +251,17 @@ Why this framing:
 - **Rainfall:** from the station nearest the link midpoint, among the stations with readings in at least 80% of the 5-minute slots on every training day (82 of 90 stations with these training days), total over the last 15 and 30 minutes. Only use readings timestamped ≤ *t* − 5 min, as a conservative allowance for publication lag.
 - **Calendar:** time of day (15-minute slot) and the day of the week, one-hot `f_mon` … `f_fri` (it includes the Friday flag; 14 Nov). Road category is the same for every link (expressways), so it is not an input.
 - **Missing updates:** a missing update reuses the previous update's value for at most 5 minutes, and `f_n_filled` counts how many of the last 7 values were reused (14 Nov). Never interpolate.
-- **Planned road works:** LTA's Approved Road Works list (collected daily) is known in advance, so an "active road works on this road today" flag is legitimate information at time *t*. Five of the seven incidents in the 13 Oct check were road works. Not built yet (14 Nov): it needs code to read LTA's road works list.
-- **Incidents:** used to audit labels. Use them as a predictor only in a sensitivity run, only incidents reported before *t*, and never the "Heavy Traffic" type, which is itself a congestion report and would be circular.
+- **Planned road works: not an input** (dropped 18 Nov). Every expressway had at least one active approved road-works permit on every weekday from 16 Oct to 13 Nov, and LTA's list gives only road names and date ranges, so an "active road works on this road today" flag would be 1 on every row.
+- **Incidents: never an input** (18 Nov, as our proposal says). They are used only to interpret events: label checks, error analysis and failure cases. Information columns in the full tables say which incident was listed near a link at *t*, and which one started within the next 15 minutes (`docs/data_rules.md`, rules 23–25; built after the test build). PUB flood alerts: none were issued on any successful poll from 16 Oct to 13 Nov, so there is nothing to add.
 
 ### 4.6 Methods and their roles [Brief §3.3 p.2]
 
 | Model | Course family | Role | Notes |
 |---|---|---|---|
-| B1: time-of-week rate | Baseline | What "knowing rush hour" alone achieves: the training-week rate of `U` for each link × slot | Required by the catalog |
+| B1: time-of-week rate | Baseline | What "knowing rush hour" alone achieves. For each link and 15-minute slot of *t*: the share of train rows that are normal now (`U = 0`) and unusual 15 minutes later (the onset rate), shrunk toward that slot's rate over all training-road links: (onsets + *m* × slot rate) / (rows + *m*), with *m* chosen by forward-chaining inside the train days (18 Nov). AYE and CTE get the slot rate only | Required by the catalog; in our proposal |
 | B2: persistence | Baseline | Last observation: score = current deficit `d(l,t)` | Required by the catalog. Expect it to be strong overall and weak on onsets |
 | Norm (stage 1) | Segment-level profile model | Defines what "recurring" means | Median by slot. A smooth regression of expected band is the alternative; be ready to discuss the bias–variance trade-off between them |
-| M1: elastic-net logistic regression | Logistic regression + regularisation | Interpretation; handles many correlated lags | Python (e.g. scikit-learn). Standardise using training statistics. Tune λ and α by forward-chaining CV within the training weeks. Check coefficient stability with a bootstrap |
+| M1: lasso logistic regression (as in our proposal; was elastic net until 18 Nov) | Logistic regression + regularisation | Interpretation; picks a few of the many correlated lags | Python (e.g. scikit-learn). Standardise using training statistics. Tune λ by forward-chaining CV within the training weeks. Check coefficient stability with a bootstrap: with correlated lags, lasso's choice of which lag to keep can be unstable |
 | M2: random forest | CART / random forests | Nonlinear benchmark, e.g. rain × peak × road type | Python (e.g. scikit-learn). Tune the number of inputs tried at each split and the minimum leaf size (`max_features`, `min_samples_leaf`) with the same CV. Use permutation importance on the validation week. Calibrate on the validation week |
 | M3 (stretch): clustering of daily profiles, with PCA first if needed | Clustering, PCA | Segmentation for error analysis and transfer | Only once Tiers 1–2 (§6.2) are done |
 
@@ -267,15 +269,16 @@ If the training set is too big for the random forest, subsample the negatives wi
 
 ### 4.7 Metrics (fixed before modelling) [Brief §4 p.3]
 
-- **Primary:** PR-AUC on onset rows (`U(l,t) = 0`) in the test week, comparing M1 and M2 against B1 and B2.
+- **Primary:** PR-AUC on onset rows (`U(l,t) = 0`) in the test week (Mon 16 – Fri 20 Nov), on the 1,909 links of the training roads (`heldout_road = False`), comparing M1 and M2 against B1 and B2 (rows fixed 18 Nov).
+- **Transfer (separate, not part of the main score):** the same on the 689 AYE and CTE links, with their own base rate, and by road.
 - **Secondary:**
   - PR-AUC on all rows;
-  - precision and recall at a fixed alert budget (the top *k* links in each 5-minute snapshot, with *k* set on the validation week; report 2–3 values of *k*);
+  - precision and recall at a fixed alert budget: the top share of the links scored at each 5-minute update (a share, not a fixed *k*, so it also works for the smaller AYE and CTE group), set on the validation week; report 2–3 shares;
   - calibration (Brier score and a reliability plot);
   - event level: the share of test episodes warned at least 10 minutes before onset, and false alarms per hour.
 - **Prevalence:** report it next to every PR-AUC, because it's the PR-AUC a random scorer would get.
 - **Uncertainty:** 95% intervals from a block bootstrap over test days. Use a paired bootstrap for the model − baseline differences. Five test days is thin, and we'll say so.
-- **Subgroups:** peak vs off-peak, rain vs dry, by road, and the held-out roads.
+- **Subgroups:** peak vs off-peak, rain vs dry, by road. The held-out roads are the separate transfer result above.
 
 ### 4.8 EDA plan [Brief §3.3 p.2]
 
@@ -289,12 +292,13 @@ If the training set is too big for the random forest, subsample the negatives wi
 ### 4.9 Diagnosis and sensitivity [Brief §3.3 p.2]
 
 - **Errors:** break down errors by subgroup. Check the largest false alarms and misses against the incidents feed.
-- **Sensitivity checks:**
-  - threshold (1 band for 3 snapshots);
-  - horizon (5, 10 and 30 minutes);
-  - norm (frozen vs rolling 21-day, and a leave-own-day-out norm for training rows: `extra/train_lodo.parquet`, 14 Nov);
-  - with and without neighbour features;
-  - with and without incident features.
+- **Secondary checks** (list fixed 18 Nov):
+  - 1 km segments instead of links (fixed in our proposal; `docs/data_rules.md` rules 26–32, built after the test build);
+  - horizon: 5 minutes (fixed in our proposal), 10 and 30 minutes (`y_h5`, `y_h10`, `y_h30` in the full tables);
+  - with and without the neighbour inputs, and with and without the joining-road inputs (`f_conn_*`);
+  - normal level: leave-own-day-out for training rows (`extra/train_lodo.parquet`);
+  - optional: threshold of 1 band for 3 snapshots; if it is run, it is reported whatever it shows.
+  - Dropped on 18 Nov: the rolling 21-day norm, incident inputs, road works.
 - **Failure case for the talk:** for example, incident-driven onsets with no precursor, or the floor effect at peak.
 - **Limitations:**
   - we don't know how LTA derives the bands, and each band is 10 km/h wide, so small slowdowns are invisible;
@@ -315,7 +319,7 @@ If the training set is too big for the random forest, subsample the negatives wi
 
 ### 5.2 Draft to adapt (fill in the [brackets])
 
-The proposal we submitted is in `project_docs/` (local only, not in git). It is not word for word this draft; the differences are being reviewed (18 Nov).
+**Superseded draft.** The proposal we submitted is in `project_docs/` (local only, not in git), and it differs from this draft: for example it names lasso, not elastic net. Where they differ, the submitted proposal and the decisions of 18 Nov in `DECISIONS.md` apply. Do not quote this draft.
 
 <!-- proposal-start -->
 
@@ -383,7 +387,7 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
 3. **Daily health check (2 minutes, data lead).** `~/slds-1.3/check.sh` on the mini PC (both collectors: heartbeat, files today, last hour's fetches, errors, disk), or monitor notebook cell 5 on the desktop. Post one line in the team chat.
 4. **Backups.** Since 16 Oct both collectors run on the Linux mini PC (two keys, §6.3); the desktop holds 14–16 Oct and is a cold spare. Copy `data_raw/` and `data_raw_expressway/` to an external drive or a team-only cloud folder at least weekly from 21 Oct. (24 Oct: replaced by the nightly Google Drive upload, `upload_raw.sh`; see `DECISIONS.md`.)
 5. **Pre-registration in `DECISIONS.md`.** Every frozen choice gets a date, a reason and an author. Changes are appended, never edited in place. This is our evidence that the outcome and metric were defined before models were compared [Brief §4 p.3].
-6. **One settings file for the modelling stage** (like `analysis/data_settings.py` for the data) holding dates, thresholds, horizon, *k*, seeds and paths. Sensitivity runs and any changes the instructor asks for then become config edits, not code rewrites.
+6. **One settings file for the modelling stage** (like `analysis/data_settings.py` for the data) holding dates, thresholds, horizon, the alert budget (a share of links), seeds and paths. Sensitivity runs and any changes the instructor asks for then become config edits, not code rewrites.
 7. **Test lock.** Test-week rows go to a separate file (`test.parquet`) that only the final test script reads. EDA and tuning scripts stop with an error if they ever see a date after 13 Nov.
 8. **Reproducibility.**
    - `requirements.txt` for the Python environment; the exact versions behind each data build are in its `build_info.json`. The collector and context script use only the Python standard library.
@@ -400,8 +404,8 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
 | Tier | Contents | Status |
 |---|---|---|
 | 1. Must (most of the points) | Collection and documentation; labels; B1, B2, M1, M2; temporal split; test-week metrics with intervals; EDA figures; limitations | [ ] |
-| 2. Should | Held-out-road transfer; calibration and alert-budget analysis; event-level metrics; sensitivity table | [ ] |
-| 3. Could | Clustering of profiles (M3); incident features; school-holiday stress test (23–27 Nov); survival analysis of episode duration (or keep it as the "next step" in the Discussion) | [ ] |
+| 2. Should | Held-out-road transfer; calibration and alert-budget analysis; event-level metrics; the secondary checks of §4.9, including 1 km segments and the 5-minute horizon (both fixed in our proposal) | [ ] |
+| 3. Could | Clustering of profiles (M3); the optional 1-band check; school-holiday stress test (23–27 Nov); survival analysis of episode duration (or keep it as the "next step" in the Discussion) | [ ] |
 
 ### 6.3 Risk register
 
@@ -414,7 +418,7 @@ The aim is that late surprises (API changes, collector crashes, instructor feedb
 | LinkIDs change | Registry shows new or vanished IDs; the build stops if the 2,598 expressway links change | Decide by hand (match by coordinates); keep links present in ≥ 90% of updates (11 Nov) |
 | Too few unusual events | Only a few hundred onset episodes in the training weeks | Add major-arterial (category 2) links, use the 1-band rule or a 10-minute horizon, and document the change in `DECISIONS.md` |
 | Endpoint or schema change | Schema warning in the log | Update the path in config; parse fields by name |
-| Traffic drifts within the window | Peak profiles differ before and after 23 Oct | Rolling-norm sensitivity check; a post-23-Oct flag |
+| Traffic drifts within the window | Peak profiles differ before and after 23 Oct | Show it in EDA and discuss it as a limitation; a post-23-Oct flag (the rolling-norm check was dropped on 18 Nov) |
 | Random forest too slow | Fits take hours | Subsample negatives and recalibrate; use fewer trees while tuning |
 | Instructor asks for changes | Approval feedback | Change config and `DECISIONS.md`, not the pipeline |
 | A member becomes unavailable | — | Every workstream has a second (§9) |
@@ -430,7 +434,7 @@ Source checks: run 13 Oct (first version, in R; removed 18 Nov) and 16 Oct (`ana
 | LTA Traffic Speed Bands (API guide §2.19) | Outcome and main features | `lta_collector.py`: probe every minute, full fetch at each LTA update (~5 min); plus `--mode expressway` with a second key: the 58 expressway pages every 2 min | **Yes**, two LTA keys (one per collector; rate limit ~4,000 calls/key/hour) | ✅ Tested 13 Oct: 143,787 links, 288 pages, 0 failures. Both collectors on the mini PC since 16 Oct |
 | LTA Traffic Incidents (§2.18) | Label audit, failure cases | `lta_collector.py`: every 2 min, saved on change | Same key | ✅ Tested; messages carry a report time, e.g. "(13/10)21:34" |
 | LTA VMS/EMAS (§2.20), Estimated Travel Times (§2.13) | Extra signals, fallback | `lta_collector.py`: every 2 / 5 min, saved on change | Same key | ✅ In collector |
-| LTA Approved Road Works (§2.16), Planned Road Openings (§2.15) | Planned disruptions (known in advance) | `lta_collector.py`: once a day | Same key | ✅ In collector |
+| LTA Approved Road Works (§2.16), Planned Road Openings (§2.15) | Planned disruptions (known in advance); not a model input (18 Nov: every expressway has active works every day) | `lta_collector.py`: once a day | Same key | ✅ In collector |
 | NEA rainfall (data.gov.sg) | Weather feature | `get_context_data.py`, downloaded after the fact by date | No (optional key raises the limit) | ✅ Tested 13 Oct, incl. 30 days back |
 | MOM public holidays 2026 | Calendar | `get_context_data.py` (data.gov.sg dataset `d_149b61ad0a22f61c09dc80f2df5bbec8`) | No | ✅ Verified |
 | MOE school calendar 2026, F1 closures | Analysis window, drift check | Dates typed into `get_context_data.py` from the MOE press release and LTA OneMotoring, with sources | No | ✅ Verified |
@@ -455,7 +459,7 @@ Source checks: run 13 Oct (first version, in R; removed 18 Nov) and 16 Oct (`ana
 | After approval | Build the pipeline on data so far (first two weeks as a development set); EDA; feature code | All |
 | Fri 30 Oct | `DECISIONS.md` v1 frozen: label rule, features, metrics, transfer roads (seeded draw) | Lead |
 | Sat 7 Nov | Norms frozen from the training weeks; training panel built | Labels lead |
-| Sun 15 – Fri 20 Nov | Fit and tune with forward-chaining CV inside the training weeks (data version 4, on Drive since 15 Nov); then the validation-week evaluation, final model choice, *k* and calibration. All before the freeze | Models leads |
+| Sun 15 – Fri 20 Nov | Fit and tune with forward-chaining CV inside the training weeks (data version 4, on Drive since 15 Nov); then the validation-week evaluation, final model choice, the alert budget (a share of links) and calibration. All before the freeze | Models leads |
 | Fri 20 Nov | **Plan freeze** (date confirmed 15 Nov): git tag `plan-freeze` before any test-week analysis. Commit the model scripts and the chosen settings first. Until the tag, nobody opens test-week data, including the raw files of 14–20 Nov on Drive | Lead |
 | Sat 21 – Sun 22 Nov | Run the final test script once and record every result, including negative ones | Models lead |
 | 23–29 Nov | Diagnostics, sensitivity, transfer, figures. Optional school-holiday stress test (needs collection to 27 Nov) | All |
@@ -509,7 +513,7 @@ Start drafting answers now and keep them in `docs/defence.md`. They cover the ca
 11. Rain has a positive coefficient. Does rain cause congestion? *(No: it's an association, conditional on the other features.)*
 12. How do incidents you can't see affect the labels and the errors?
 13. Deployment latency: when would an operator actually receive the alert?
-14. Would your conclusion change with a 1-band threshold, a 30-minute horizon or a rolling norm?
+14. Would your conclusion change with 1 km segments instead of links, a 5- or 30-minute horizon, a 1-band threshold, or a normal level built without the scored day?
 15. Do arterial roads get worse warnings than expressways? Who is under-served?
 16. Why a median-by-slot norm rather than a regression for expected speed? *(The bias–variance trade-off.)*
 17. Are the random forest's probabilities calibrated? Which variable-importance method did you use, and why?
