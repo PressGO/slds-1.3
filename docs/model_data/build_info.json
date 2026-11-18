@@ -1,12 +1,12 @@
 {
   "data_version": "4",
-  "built_at": "2026-11-15T09:04:12+08:00",
+  "built_at": "2026-11-18T21:29:23+08:00",
   "built_as_of": "2026-11-15 08:59",
-  "git_commit": "79393d2-modified",
+  "git_commit": "b11aae5",
   "code_sha256": {
-    "analysis/data_settings.py": "0ae297fc7b3ce23b70f14aa2f8c01361949094379ff442dff285f3cdb9fda725",
-    "analysis/data_steps.py": "84aaf78c06573c101bc5fda8a1549e919e26db432e1c92ad54642940087c1fe2",
-    "analysis/build_data.py": "f5d07b75e2c2913e9c48e92df465fcb9c1be42ae99fb5e1e0c2d3ec1470916ae",
+    "analysis/data_settings.py": "3f2218b3420bb4cd7031e7c461ed42d4580335347f73f09bd5bc6e885e858c46",
+    "analysis/data_steps.py": "eeeeb5cb158aff6296b45d878504691c90db2a64d233b36fcdadc12f4c40226c",
+    "analysis/build_data.py": "7c00bafa0f56a27d0de4f20f1ce340985970c721ea9d1eba908ecdb4e659c8dd",
     "analysis/test_data_steps.py": "fddae7746811644feaf9cc87e62bfe1037d6fd00db0fca69a0e95d16831e316e"
   },
   "software": {
@@ -217,8 +217,8 @@
       "bytes": 12803983,
       "digest": "f3e90caa41f0af27f4e994ddfb9e87926d4169c959703ad97c4f9acb86358ae1"
     },
-    "rainfall_5min.csv.gz": "d37b29c64266767cfc47333986801a2a714685d37d8bf5c0ef6b5cd1dc4e1055",
-    "rain_stations.csv": "6aeca6071f887860ad55ee5cf62891fc5eab112e7ec33e55a3ce3c5552f44178",
+    "rainfall_5min.csv.gz": "a8fb9e1b5f257f00cad7b59c1a84205c3abf8b90df5dd7e89e35314e548e0380",
+    "rain_stations.csv": "ef562eba5abc525f8f677fbb78c567102896e50bed003578512a0642da29161b",
     "calendar_2026.csv": "bb57fc2be514df34b087ad85becc86334d0fd4f6218fd3a32b05a829622c3c1f"
   },
   "checks": [
@@ -793,6 +793,6 @@
       "detail": "6,401,116 rows"
     }
   ],
-  "peak_memory_mb": 9204,
-  "seconds": 301
+  "peak_memory_mb": 9470,
+  "seconds": 297
 }

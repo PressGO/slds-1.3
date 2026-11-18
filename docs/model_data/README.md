@@ -1,6 +1,6 @@
 # SLDS 1.3 model data (data version 4)
 
-Built 2026-11-15 09:04 (git `79393d2-modified`) by `analysis/build_data.py`, from
+Built 2026-11-18 21:29 (git `b11aae5`) by `analysis/build_data.py`, from
 the raw LTA files. Days 2026-10-16 to 2026-11-14. New days are added with the
 same version number. A change of rule raises the version (see "Changes" at the end).
 
@@ -9,7 +9,7 @@ same version number. A change of rule raises the version (see "Changes" at the e
 | File | What it is |
 |---|---|
 | `train.parquet` | The rows to train on: 6,401,116 rows with `split = "train"` and 1,647,272 with `split = "validate"`. Weekdays only (Monday to Friday, no public holidays), as in our proposal. Only usable rows, only the columns models need. |
-| `test.parquet` | The test week (Mon 16 to Fri 20 Nov). Added after the test week ends and the plan is frozen. Do not open it before then. |
+| `test.parquet` | The weekdays of the test week, Mon 16 to Fri 20 Nov (the test week runs from Sat 14 to Fri 20 Nov; its Saturday and Sunday are only in `extra/test_full.parquet`). Added after the test week ends and the plan is frozen. Do not open it before then. |
 | `README.md` | This file. |
 | `extra/` | Everything else. You do not need it to train a model. |
 
@@ -19,7 +19,7 @@ In `extra/`:
 |---|---|
 | `train_sample.parquet` | The `train.parquet` rows of 300 links that are not on a held-out road (926,876 rows). Use it to test your code fast. |
 | `train_lodo.parquet` | The `train` days again, but each day's normal level is built without that day. Same columns as `train.parquet`. For the plan's leave-own-day-out check (see "Good to know"). |
-| `full_table.parquet` | Every row of the train and validate days, for exploring: every day of the week (`in_population` = FALSE on Saturdays, Sundays and public holidays), also the rows we cannot use (`use` = FALSE), with `y_h5`, `y_h10`, `y_h30` (the answer 5, 10, 30 minutes ahead), `f_sat`, `f_sun`, `f_holiday` and `info_` columns. |
+| `full_table.parquet` | Every row of the train and validate days, for exploring: every day of the week (`in_population` = False on Saturdays, Sundays and public holidays), also the rows we cannot use (`use` = False), with `y_h5`, `y_h10`, `y_h30` (the answer 5, 10, 30 minutes ahead), `f_sat`, `f_sun`, `f_holiday` and `info_` columns. |
 | `test_full.parquet` | The same for the test week (later). |
 | `links.parquet` | One row per link: road, held-out road or not, coordinates, rain station, number of neighbours and joining roads. |
 | `neighbours.parquet`, `connectors.parquet` | Which link follows which; which roads join which link. |
@@ -28,22 +28,26 @@ In `extra/`:
 | `incidents.parquet` | LTA incident messages (accidents, breakdowns), for checking errors. Not an input. |
 | `build_info.json`, `SHA256SUMS.txt` | How the files were built (every check and its result) and their checksums. |
 
-## Quick start (R)
+## Quick start (Python)
 
-`train.parquet` has 8,048,388 rows and needs about 3 GB of memory in R. Start with
-`extra/train_sample.parquet`. For the full data, read only the columns you need.
+`train.parquet` has 8,048,388 rows and takes about 2.4 GB of memory in pandas (more while it loads).
+Start with `extra/train_sample.parquet`. For the full data, read only the columns you need (`columns=[...]`).
+pandas needs `pyarrow` to read `.parquet` files (both are in `requirements.txt`).
 
-```r
-library(arrow); library(dplyr)
-d   <- read_parquet("extra/train_sample.parquet")   # later: read_parquet("train.parquet")
-d   <- d |> filter(!heldout_road)          # AYE and CTE: only for the transfer check in the test week
-fit <- d |> filter(split == "train")       # fit and tune the models on these rows
-val <- d |> filter(split == "validate")    # choose the final model and calibrate on these rows
-x   <- fit |> select(starts_with("f_"))                            # all inputs, no missing values
-x0  <- fit |> select(starts_with("f_"), -starts_with("f_conn_"))   # the same without the joining roads
-y   <- fit$y                               # TRUE = unusual 15 minutes later
-onset <- !fit$U                            # the main score uses these rows: normal now
+```python
+import pandas as pd
+d   = pd.read_parquet("extra/train_sample.parquet")   # later: pd.read_parquet("train.parquet")
+d   = d[~d["heldout_road"]]          # AYE and CTE: only for the transfer check in the test week
+fit = d[d["split"] == "train"]       # fit and tune the models on these rows
+val = d[d["split"] == "validate"]    # choose the final model and calibrate on these rows
+inputs  = [c for c in d.columns if c.startswith("f_")]            # all inputs, no missing values
+inputs0 = [c for c in inputs if not c.startswith("f_conn_")]      # the same without the joining roads
+X = fit[inputs].to_numpy("float32")  # one row per link and time, one column per input
+y = fit["y"].to_numpy()              # True = unusual 15 minutes later
+onset = ~fit["U"].to_numpy()         # the main score uses these rows: normal now
 ```
+
+polars works too: `pl.read_parquet(...)`, with the same column names.
 
 ## One row
 
@@ -55,15 +59,14 @@ expressway. Column `road` has 12 values.
 | Split | Dates | Weekdays used | Use |
 |---|---|---|---|
 | `train` | Fri 16 Oct to Fri 06 Nov | 16 | fit and tune the models; the normal level comes from these days only |
-| `validate` | Sat 07 Nov to Fri 13 Nov | 4 | choose the final model, calibrate, set the alert budget k |
-| `test` | Sat 14 Nov to Fri 20 Nov (not finished yet) | 0 | final test, once, after the plan is frozen |
+| `validate` | Sat 07 Nov to Fri 13 Nov | 4 (Mon 09 Nov is a public holiday) | choose the final model, calibrate, set the alert budget |
+| `test` | Sat 14 Nov to Fri 20 Nov (not finished yet) | 0 so far; Mon 16 to Fri 20 Nov when finished | final test, once, after the plan is frozen |
 
-Our proposal's training period starts on Tue 13 Oct, but our data starts on Fri 16 Oct (collection from 11:10
-that day). Mon 9 Nov (the Deepavali holiday) is not used.
+Our data starts on Fri 16 Oct (collection from 11:10 that day). Mon 9 Nov (the Deepavali holiday) is not used.
 
 ## Held-out roads (transfer check)
 
-`heldout_road` = TRUE for the 689 links of the Ayer Rajah Expressway and Central Expressway. They were drawn at random with
+`heldout_road` = True for the 689 links of the Ayer Rajah Expressway and Central Expressway. They were drawn at random with
 a fixed seed before any model was fitted (the same draw as data versions 1 and 2). Never use their rows to fit,
 tune, choose or calibrate a model. In the test week, score them on their own: does a model trained on the other
 roads work on roads it has never seen?
@@ -86,9 +89,11 @@ y:                                                      |         low    low
 - **Low** = a drop of 2 or more.
 - **`U`** (unusual now) = low now and 5 minutes ago. `U` is unknown when either update is missing; those rows
   are not in `train.parquet`.
-- **`y`** (the answer) = `U` 15 minutes later. In `train`, 2.3% of rows are TRUE.
-- **Main score**: PR-AUC on the rows that are normal now (`U == FALSE`), in the test week. On those rows only
-  1.0% (train) and 1.3% (validate) become unusual. That is also the PR-AUC of a model that guesses.
+- **`y`** (the answer) = `U` 15 minutes later. In `train`, 2.3% of rows are True.
+- **Main score**: PR-AUC on the rows that are normal now (`U == False`) in the test week, on the training roads
+  (`heldout_road == False`). AYE and CTE get a score of their own (the transfer check). Of the rows that are normal
+  now, 1.0% (train) and 1.3% (validate) become unusual 15 minutes later (all roads together).
+  That share is also the PR-AUC of a model that only guesses.
 
 ## The inputs (`f_` columns, all known at time `t`)
 
@@ -109,7 +114,7 @@ y:                                                      |         low    low
 | `f_conn_in_none`, `f_conn_out_none` | 1 = no such road (values then 0) |
 | `f_conn_in_missing`, `f_conn_out_missing` | 1 = a road exists but a value was missing (then 0) |
 
-The `f_conn_` inputs are extra: train every model with and without them (`x` and `x0` above), on the same rows.
+The `f_conn_` inputs are extra: train every model with and without them (`inputs` and `inputs0` above), on the same rows.
 
 Other columns: `LinkID`, `road`, `heldout_road`, `t` (Singapore time), `date`, `daytype` (always `weekday`
 here), `split`, `y`, `U`. Rows are in the order split, link, time.
@@ -117,13 +122,17 @@ here), `split`, `y`, `U`. Rows are in the order split, link, time.
 ## Rules
 
 - Use only the `f_` columns as inputs. Never use `y`, `U`, `split`, `heldout_road` or anything from `extra/` as an input.
-- Never fit, tune, choose or calibrate on rows with `heldout_road == TRUE`.
+- Never fit, tune, choose or calibrate on rows with `heldout_road == True`.
 - Fit on `split == "train"`. Tune by forward-chaining inside the train days: fit on earlier days, check on
-  later days, never the other way round. Use `split == "validate"` to choose the final model, calibrate and set
-  the alert budget *k*. Do not open `test.parquet` before the plan is frozen.
+  later days, never the other way round. For example, with whole weeks: fit on 16-23 Oct and check on 26-30 Oct;
+  then fit on 16-30 Oct and check on 2-6 Nov. Use `split == "validate"` to choose the final model, calibrate and
+  set the alert budget (the share of links to alert on at each update). Do not open `test.parquet` before the plan
+  is frozen.
 - Do not take "the row above" as the previous update. Use `f_d5`, `f_d10`, ...
-- Set a random seed. For `glmnet`, treat `f_slot15` as a curve or as hour groups, not a straight line. For
-  `ranger` on all rows, you may use fewer FALSE rows (fixed seed) and then calibrate on `validate`.
+- Set a random seed. For the lasso logistic regression, scale the inputs with the mean and standard deviation of the
+  rows you fit on, and treat `f_slot15` as a curve or as hour groups, not a straight line. For the random forest
+  on all rows, you may keep fewer False rows (fixed seed) and then calibrate on `validate` (calibrate = adjust the
+  predicted chances so that they match how often slowdowns really happen).
 - Write the data version (4) next to every result.
 
 ## Good to know
