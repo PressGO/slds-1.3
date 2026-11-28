@@ -23,7 +23,6 @@ road. A score that only guesses would reach 0.0125.
 | To see | Open |
 |---|---|
 | The results in one place | `notebooks/part4_summary.ipynb` |
-| The report (draft) | `report/report.pdf` |
 | 1. How the data were collected and built | `notebooks/part1_data_collection_and_transformation.ipynb` |
 | 2. Exploration and the inputs we built | `notebooks/part2_eda_and_feature_engineering.ipynb` |
 | 3. The models, from tuning to the test week | `notebooks/part3_models.ipynb` |
@@ -39,7 +38,6 @@ The notebooks are saved with their outputs, so they can be read here without run
 | `modelling/` | the models as numbered scripts, `01_eda.py` to `16_classifiers_and_roc.py` |
 | `results/` | the result tables, the record of the frozen settings, the test-week log |
 | `figures/` | every figure, made by code |
-| `report/` | the report and the script that makes its PDF |
 | `docs/` | how to reproduce, the data rules, the build record, the project plan |
 
 ## Run it
@@ -74,3 +72,5 @@ data accessed from data.gov.sg, which are made available under the terms of the 
 - `DECISIONS.md`: the dated decisions
 - `AI_USE.md`: how AI tools were used and how the output was checked
 - `CONTRIBUTIONS.md`: who did what [TEAM: to fill in]
+
+The report is submitted separately and is not in this repository.

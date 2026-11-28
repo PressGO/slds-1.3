@@ -103,7 +103,7 @@ Shared code:
 
 - `06_random_forest.py` reads its saved tuning scores from `results/tables/06_rf_cv_cache.json` and does not fit
   the grid again. This keeps a new run equal to the frozen run, including its choice of `max_features` 0.6 (0.35 and
-  0.6 tie; see the report, appendix A). The Part 3 notebook fits the grid afresh. Delete the file to tune again: the
+  0.6 tie; see the Part 3 notebook, section 5). The Part 3 notebook fits the grid afresh. Delete the file to tune again: the
   tie rule then picks 0.35.
 - `run_all.sh` uses `systemd-run` to cap the memory (Linux). On another system, run the scripts in the same order
   with plain `python`.

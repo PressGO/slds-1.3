@@ -16,7 +16,7 @@ The folders follow the list in the course brief (section 6.2):
 | `R/`: functions or reusable code | `analysis/data_settings.py`, `analysis/data_steps.py` (data); `modelling/settings.py`, `common.py`, `features.py`, `modeldata.py`, `lassofit.py`, `segments.py`, `plotstyle.py` (models) |
 | `analysis/`: ordered scripts or notebooks | `notebooks/part1` to `part4` (the walk-through, in order); the same steps as scripts: `analysis/build_data.py`, then `modelling/01_eda.py` to `16_classifiers_and_roc.py` |
 | `figures/`: final figures made by code | `figures/report/` (the report's figures), `figures/notebooks/` (drawn by the four notebooks), `figures/pipeline/` (drawn by the scripts in `modelling/`); the four pictures directly in `figures/` come from `03_visuals.ipynb` |
-| `report/` | `report/report.md`, `report.html`, `report.pdf`, `build_report.py` |
+| `report/` | the report is submitted separately and is not in this repository; its three figures are in `figures/report/` |
 | `slides/` | not written yet |
 | `AI_USE.md` | `AI_USE.md` |
 
@@ -99,7 +99,6 @@ with the project's Python.
 | Part 2 | `notebooks/part2_eda_and_feature_engineering.ipynb`: the EDA, then the engineered inputs with their checks | 2 min | train and validation days |
 | Part 3 | `notebooks/part3_models.ipynb`: baselines, lasso and forest from tuning to the validation week; it stops unless its models equal the frozen ones; then the saved test-week result | about 1 hour, 14 GB of memory | train and validation days |
 | Part 4 | `notebooks/part4_summary.ipynb`: the results in one place. It builds the report's tables and figures from the saved result files and fits no model | under a minute | `results/`, and the validation scores written by Part 3 |
-| Report | `python report/build_report.py`: turns `report/report.md` into `report.html` and `report.pdf` (A4, 11-point text) and prints the page on which each section starts | seconds | `report/report.md`, `figures/report/` |
 
 The notebooks are the walk-through. The same pipeline as scripts is in `modelling/` (see `modelling/README.md`):
 `./run_all.sh` runs the exploration, the inputs, the baselines, both models, the validation week and the freeze,
@@ -110,7 +109,7 @@ On a system without `systemd-run` (macOS, Windows), run the scripts of `run_all.
 
 **The forest's tuning scores are read, not fitted again.** `06_random_forest.py` reads its saved tuning scores from
 `results/tables/06_rf_cv_cache.json` and does not fit the grid again. This keeps a new run equal to the frozen run,
-including its choice of `max_features` 0.6 (report, appendix A). The Part 3 notebook fits the grid afresh. Delete the
+including its choice of `max_features` 0.6 (Part 3 notebook, section 5). The Part 3 notebook fits the grid afresh. Delete the
 file to tune again with the scripts: the tie rule then picks 0.35, and the numbers after it change a little.
 
 **The test week.** The settings and a hash of every model file were frozen on 25 Nov 2026 (`results/freeze.json`).
@@ -139,7 +138,6 @@ freeze record), unzip `test_week_build.zip` into `work/data_build/`, then run
 | `figures/` | Every figure, made by code: `report/` (the report's three figures), `notebooks/` (drawn by the four notebooks), `pipeline/` (drawn by the scripts in `modelling/`) |
 | `work/` | Large files rebuilt by the scripts (engineered inputs, fitted models, saved scores). Not in the repository |
 | `run_models.py` | The team's first version of the models (25 Nov): the two baselines, a logistic model and a forest on the 53 build inputs, with validation PR-AUC. Kept as it was; the final pipeline is `modelling/` |
-| `report/` | `report.md` (the source of the report draft), `build_report.py` (makes `report.html` and `report.pdf` from it). The report's figures are in `figures/report/`: `report_fig1_exploration.png` (made by the Part 2 notebook), `report_fig2_test_week.png` and `report_fig3_onsets_caught.png` (made by the Part 4 notebook) |
 | `CONTRIBUTIONS.md` | Who did what [TEAM: to fill in] |
 
 ## Collecting
