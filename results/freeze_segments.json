@@ -1,0 +1,17 @@
+{
+  "frozen_at": "2026-11-26T00:42:06+08:00",
+  "statement": "Segment tables and models built from the train and validation days with the settings of freeze.json, before any test-week data was opened.",
+  "b1_m": 48,
+  "models_sha256": {
+    "seg_b1.pkl": "6702b2160b2180177e1315c94089d47dcf4dbd7d76bf15d98ea3788b6fed6d5c",
+    "seg_lasso.pkl": "79b113b15994884f4d58a7464e5ae725f839b642c36064ba750aa7a6c334adf7",
+    "seg_rf.pkl": "22af80fb89f021cc4491c9f20212331d5bf19f20efdd88cba7304555e1a4a6f1"
+  },
+  "tables_sha256": {
+    "segments.parquet": "3c83c6f1e13fa0f1b64d46c3e410e1d65b3f2b81ee8d7592cccdf31b14f7e924",
+    "segment_links.parquet": "6f1e2264beb9c854f0ac71d464b358f0fa73a92602d7626b7032a130e2eac62d",
+    "segment_norm.parquet": "840b0b860e1705b8002e0edcb9ab47c65af2f1f688378d10b52798da74189cdf",
+    "segment_station.parquet": "662b58d1582d1d33cefd9bad09917dcdbe206d869d0a24479d4a4f3b9feefcf7",
+    "segment_pairs.parquet": "6bd62a9eb58f7b33fa928edef1a1d9d299cc0d8708061ea14e27181c70d29798"
+  }
+}

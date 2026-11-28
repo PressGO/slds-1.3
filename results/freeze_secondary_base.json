@@ -1,0 +1,10 @@
+{
+  "frozen_at": "2026-11-26T00:42:54+08:00",
+  "statement": "Secondary models fitted on the train days with the settings of freeze.json, before any test-week data was opened.",
+  "models_sha256": {
+    "sec_base_b1_h5.pkl": "cc63b6d318a968c0b298192801ae7bfc4230994c187c02ecbfdad1b124e34ad1",
+    "sec_base_b1_h10.pkl": "bd7528c8fc9ca311878e6abc9779f3967f9bf36fd9a4fc7c577041d7ad5cf0b2",
+    "sec_base_b1_h15.pkl": "f4781165a0bf410d60cbe98b4483aebdc6fec28b2eef8c98aea413edd546384a",
+    "sec_base_b1_h30.pkl": "f0406a1e221724da659da017b17a23cf5477bb4f2d13820c9416339498781d31"
+  }
+}

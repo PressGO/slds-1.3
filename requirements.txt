@@ -9,3 +9,4 @@ jupyterlab>=4.0
 pandas>=2.0      # models: reading the parquet tables (pandas needs pyarrow for that)
 pyarrow>=14
 scikit-learn>=1.3
+scipy>=1.10     # models: rank correlation of the two importance measures

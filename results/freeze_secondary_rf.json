@@ -1,0 +1,15 @@
+{
+  "frozen_at": "2026-11-26T00:35:06+08:00",
+  "statement": "Secondary models fitted on the train days with the settings of freeze.json, before any test-week data was opened.",
+  "models_sha256": {
+    "sec_rf_h5.pkl": "a6f000e2d6cc4315f9f01af057114bb75640ea237da4d72708e665bfc2b10c4c",
+    "sec_rf_h10.pkl": "60b24e198b392a1c4e77b20fac8e10277a6a31958fde293693f071faa3129f65",
+    "sec_rf_h30.pkl": "2cf24105f2e2ef20cb4f06c8a64829f0d27b3ddd3db029f5ef550c1a0e9ebec1",
+    "sec_rf_no_conn.pkl": "6c161857260bf6e7a41e8022e90c6afcbfc869393e869f475763109db3756e18",
+    "sec_rf_no_neighbours.pkl": "88e4a04bbab5764704c69baa55ce7f7832f9234ebb0907f139c73b73ccce4f3f",
+    "sec_rf_no_conn_no_neighbours.pkl": "965a302087a52ae6e5faf318a40ff1d6cbb2da2dfbdfa4383f9921c203832bbe",
+    "sec_rf_no_hist.pkl": "aabca3b22cc7cc2655679eac6d777be23132e8e6f6ebf2d28ec55e94c9627e44",
+    "sec_rf_base53_trainnorm.pkl": "67a27e964c1b3884dd3630f6a749fdcaf39e807d58ce064e7665ce04bf07981f",
+    "sec_rf_base53_lodonorm.pkl": "d679f900578984308a92cb7f98283c8dcdfef7189859204df7aa7c3904812e46"
+  }
+}
