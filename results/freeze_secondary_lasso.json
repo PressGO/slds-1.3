@@ -1,0 +1,15 @@
+{
+  "frozen_at": "2026-11-26T00:41:07+08:00",
+  "statement": "Secondary models fitted on the train days with the settings of freeze.json, before any test-week data was opened.",
+  "models_sha256": {
+    "sec_lasso_h5.pkl": "ac04914390e1acfcee93acb66baf6c275c0041a85c352fada63603b140c478c2",
+    "sec_lasso_h10.pkl": "7ed9d5390db611ef315c5325e62f1e86d4c464f2967bc249552c07703f2a9aff",
+    "sec_lasso_h30.pkl": "8e93ba493dd073493901e5928322e81c7c448f563d3e8507b14d29cf450d53f7",
+    "sec_lasso_no_conn.pkl": "4cffd45a09d61fab618bf93ce36f298a1730d94224105019e471cbe239626366",
+    "sec_lasso_no_neighbours.pkl": "9f3153305c89ecf859c64c38b4d6277242a3d11eec18dbd7836887bd04ed8114",
+    "sec_lasso_no_conn_no_neighbours.pkl": "ea0355e082321479226ff18a7b62f6d3bd7bb283f16aae66c9aad4a87d3a5eed",
+    "sec_lasso_no_hist.pkl": "cab041b69dd70419f54543479c0ec31c49324471c09c58cc3e02f03e6a068479",
+    "sec_lasso_base53_trainnorm.pkl": "9e1f4ecff32643b2fee794ea449b02999962602b6a4a8b12a3c345cba195eb72",
+    "sec_lasso_base53_lodonorm.pkl": "33c2a0a1dde08713483600a8b799ad711f4a0ccc20f11b980d82dc8dd8dfc5ac"
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "frozen_at": "2026-11-25T23:46:25+08:00",
+  "statement": "Written before any test-week (14-20 Nov) row, label or raw file was opened by this analysis.",
+  "repo_head": "c09858e",
+  "data_version": "4",
+  "train_parquet_sha256": "ab7491600dfec88784275aea8abd32cd1bfdccc8a3a43845ab1cae4750780c70",
+  "scored_rows": "normal now (U = False); main = training roads (heldout_road = False); transfer = AYE + CTE",
+  "B1": {
+    "m": 48,
+    "tables": "models/b1_cell.parquet, models/b1_slot.parquet (train days, training roads)"
+  },
+  "B2": "f_d0",
+  "features": {
+    "LR": [
+      "BASE",
+      "NORM",
+      "HOP",
+      "HIST"
+    ],
+    "RF": [
+      "BASE",
+      "NORM",
+      "HOP",
+      "HIST"
+    ]
+  },
+  "lasso": {
+    "frac_of_lambda_max": 0.0003,
+    "lambda_per_row": 1.0579206270758171e-05,
+    "solver": "IRLS + coordinate descent (lassofit.py)"
+  },
+  "rf": {
+    "params": {
+      "max_features": 0.6,
+      "min_samples_leaf": 20
+    },
+    "trees": 400,
+    "neg_keep": 0.1
+  },
+  "calibration_platt_logit": {
+    "B1": [
+      -0.163586013614497,
+      0.9092363241544293
+    ],
+    "Lasso": [
+      -0.09815177233945768,
+      0.9670441235301284
+    ],
+    "RF": [
+      -2.2969877958196503,
+      0.9963375328421558
+    ]
+  },
+  "final_model": "RF",
+  "operating_share": 0.02,
+  "report_shares": [
+    0.005,
+    0.01,
+    0.02
+  ],
+  "peak_slots": [
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79
+  ],
+  "event_level": "episode start s: U(s)=1, U(s-5)=0 known; warned if alerted at s-15 or s-10; false alarm = alert with y=0",
+  "bootstrap": {
+    "reps": 2000,
+    "seed": 20261125,
+    "unit": "day",
+    "paired": true
+  },
+  "files_sha256": {
+    "01_eda.py": "3d48c34cd8a5498378e6559e5ed6ff3017aabe3aff4c7ecfc4fffd4cd33ae568",
+    "02_features.py": "52b46ed9f4f0604ace6f2138823b25172704bc5ecc59b21a491f4e9e5b4c7e35",
+    "03_baselines.py": "b084008dd635df4cae3b6ef52893aae3f9340d994dfc2538e081ab67c9633674",
+    "04_screen_features.py": "e74863e5049d9609cdbe89d6525fa095f6287e191bdc956568929893e73023be",
+    "05_lasso.py": "18476678e66168dfd631fec52e599b4e8582ba702c772163db3662889bda1255",
+    "06_random_forest.py": "a2fbd9a59101ff8c3e75dd4969d911a2ac3172d5b55b23773f24dc7cc466c902",
+    "07_validate_and_freeze.py": "f54fbfcab147b7ef61c41f63abe9edd8e89a34bd15b463ef12caf99e1aac6048",
+    "08_secondary.py": "772fbc81a9fb2892e53780dc3f9989477d0c337bd8df5e6a7f1dbbfb392236d7",
+    "09_segments.py": "c66c277498eee767076ac2a7788da838581eefdd3ff439b32c08166e676a4c1d",
+    "10_test.py": "3cc60b36a7256e3239be5c71ba98483e6b9d54612e7c425ff2e387b524a1a512",
+    "11_diagnostics.py": "2653d0f131faf94deb5882640eb3d460b318818bd80ceebf9d7275b97ba02ec1",
+    "check_lassofit.py": "6fddb60f27bd8dc03b664db1a4d87d7a5220c81337019bfd71f1c02ac0661e89",
+    "common.py": "3a2deb69ab09018250048525872b1d123c2bf19243c4ef816a26411f6af24871",
+    "features.py": "4d513315496c53101aff35052140c80f686b2af034b5ee9432b20f7e8f8a6d32",
+    "lassofit.py": "673be004c636ff9f21005c6841e1a7ef2b1f50579a96cf8a8d64e6cb2affb13f",
+    "modeldata.py": "954d86033d43866c11c863a522460abf65df225ef36496a6b967f8a460fbaecf",
+    "out/models/b1_cell.parquet": "fe7b233d0bb899f1e51b97aaca1cec136e432bf44d7617384b3f71c6bac1c975",
+    "out/models/b1_slot.parquet": "b4f40d07fd7e0c7f077cd225be4b1fdcb0bac048d67536acdd920a6406d70d16",
+    "out/models/lasso.pkl": "7225b4e37328e2476f9f9afdaab3b7158c27a2e09d1e5b1de7457467756cb202",
+    "out/models/rf.pkl": "f9af31f802f7b0996bf8b24804aeacb024a32f50aaad57f447e41c7f91255cc6",
+    "plotstyle.py": "f95c565d4f1643c24129c74c2408c71fabcc2bd3f0a37df91e5464d89006c318",
+    "segments.py": "3a29d1a2f2967fa615b3f16c38df6c5847f1f94fe5a167af556a9ee606d55107",
+    "settings.py": "4b10524879dcb0a85c7d20a6e830dde7710acf285e05df82fe07e4f2eb30358c"
+  }
+}
